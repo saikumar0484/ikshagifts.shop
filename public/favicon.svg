@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="18" fill="#fff7ef" />
+  <circle cx="32" cy="32" r="24" fill="#fffdf9" stroke="#d8b9a7" stroke-width="2" />
+  <text
+    x="32"
+    y="39"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="23"
+    font-style="italic"
+    fill="#944f3f"
+  >
+    IG
+  </text>
+</svg>

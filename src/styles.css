@@ -136,7 +136,12 @@
   from { transform: translateX(-120%); }
   to   { transform: translateX(120%); }
 }
+@keyframes hero-zoom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
 .animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
 .animate-drift      { animation: drift 8s ease-in-out infinite; }
 .animate-fade-up    { animation: fade-up 0.55s cubic-bezier(.2,.8,.2,1) both; }
 .animate-image-sheen { animation: image-sheen 1.35s ease-out infinite; }
+.animate-hero-zoom  { animation: hero-zoom 9s ease-in-out infinite; }

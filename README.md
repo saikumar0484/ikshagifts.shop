@@ -9,7 +9,7 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 - Storefront: `https://ikshagifts.shop`
 - Admin dashboard: `https://admin.ikshagifts.shop`
 - Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-clxzq6bzp.vercel.app`
-- Latest preview deployment for the homepage / collection redesign: `https://iksha-gifts-supabase-commerce-5fnksl5fq.vercel.app`
+- Latest preview deployment for the visual-first hero refinement: `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
 
 ## What this project is
 
@@ -37,7 +37,7 @@ What is working:
 - Storefront UI and product catalog
 - Homepage now has a premium gifting-focused redesign preview with:
   - new welcome offer announcement bar
-  - new text-led hero plus image slider
+  - new visual-first hero with collections rail and image slider
   - women / men / custom collections
   - featured and best-selling product sections
   - social proof and gift experience sections
@@ -58,6 +58,19 @@ What is not fully finished yet:
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
 ## Latest major work completed
+
+### Visual-first hero refinement
+
+- Removed the text-heavy left-side hero messaging so the homepage feels cleaner and more premium
+- Replaced that content block with a lean `Collections` rail beside the hero visual
+- Increased the visual dominance of the right-side hero slider
+- Added subtle lightweight hero motion:
+  - slow zoom loop on active imagery
+  - gentle floating motion on hero badges
+- Updated the top welcome offer from `Rs.250 OFF` to `Rs.150 OFF`
+- Updated the free-shipping code to `EKSHA150`
+- Created a new separate Vercel preview deployment for review:
+  - `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
 
 ### Homepage and collections refresh
 

@@ -1,13 +1,16 @@
 import { Suspense, lazy } from "react";
 import { AuthModal } from "@/components/site/AuthModal";
 import { CartDrawer } from "@/components/site/CartDrawer";
+import { CollectionNav } from "@/components/site/CollectionNav";
 import { DeferredSection } from "@/components/site/DeferredSection";
+import { GiftExperience } from "@/components/site/GiftExperience";
 import { Hero } from "@/components/site/Hero";
-import { Marquee } from "@/components/site/Marquee";
 import { Nav } from "@/components/site/Nav";
 import { OrdersDrawer } from "@/components/site/OrdersDrawer";
 import { Shop } from "@/components/site/Shop";
+import { SocialProof } from "@/components/site/SocialProof";
 import { TrustBar } from "@/components/site/TrustBar";
+import { WhatsAppFloat } from "@/components/site/WhatsAppFloat";
 import { CommerceProvider } from "@/lib/commerce";
 
 const AdminDashboard = lazy(() =>
@@ -33,6 +36,9 @@ const Footer = lazy(() =>
 
 export function App() {
   const isAdminHost = window.location.hostname.startsWith("admin.");
+  const collectionMatch = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
+  const activeCollection = (collectionMatch?.[1] as "women" | "men" | "custom" | undefined) || null;
+
   if (isAdminHost || window.location.pathname.startsWith("/admin")) {
     return (
       <Suspense fallback={<div className="grid min-h-screen place-items-center bg-background text-foreground">Loading admin...</div>}>
@@ -45,20 +51,26 @@ export function App() {
     <CommerceProvider>
       <main className="min-h-screen bg-background">
         <Nav />
-        <Hero />
+        {!activeCollection && <Hero />}
+        <CollectionNav active={activeCollection} />
         <TrustBar />
-        <Marquee />
-        <Shop />
-        <DeferredSection id="about" minHeight={980}>
-          <Suspense fallback={null}>
-            <About />
-          </Suspense>
-        </DeferredSection>
-        <DeferredSection id="gallery" minHeight={780}>
-          <Suspense fallback={null}>
-            <Gallery />
-          </Suspense>
-        </DeferredSection>
+        <Shop collectionSlug={activeCollection} />
+        {!activeCollection && (
+          <>
+            <SocialProof />
+            <GiftExperience />
+            <DeferredSection id="about" minHeight={980}>
+              <Suspense fallback={null}>
+                <About />
+              </Suspense>
+            </DeferredSection>
+            <DeferredSection id="gallery" minHeight={780}>
+              <Suspense fallback={null}>
+                <Gallery />
+              </Suspense>
+            </DeferredSection>
+          </>
+        )}
         <DeferredSection id="contact" minHeight={720}>
           <Suspense fallback={null}>
             <Contact />
@@ -71,6 +83,7 @@ export function App() {
           <Footer />
         </Suspense>
       </main>
+      <WhatsAppFloat />
       <CartDrawer />
       <OrdersDrawer />
       <AuthModal />

@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/collections/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/admin/:path*",
       "destination": "/index.html"
     }

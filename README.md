@@ -9,6 +9,7 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 - Storefront: `https://ikshagifts.shop`
 - Admin dashboard: `https://admin.ikshagifts.shop`
 - Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-clxzq6bzp.vercel.app`
+- Latest preview deployment for the homepage / collection redesign: `https://iksha-gifts-supabase-commerce-5fnksl5fq.vercel.app`
 
 ## What this project is
 
@@ -34,6 +35,13 @@ The project code is now also pushed to GitHub here:
 What is working:
 
 - Storefront UI and product catalog
+- Homepage now has a premium gifting-focused redesign preview with:
+  - new welcome offer announcement bar
+  - new text-led hero plus image slider
+  - women / men / custom collections
+  - featured and best-selling product sections
+  - social proof and gift experience sections
+  - floating WhatsApp CTA
 - Cart drawer and guest checkout gate
 - Customer login endpoint
 - Order tracking UI and admin order status workflow
@@ -44,12 +52,28 @@ What is working:
 
 What is not fully finished yet:
 
-- Customer signup OTP flow is blocked because automated phone or WhatsApp OTP is not configured
+- Automated phone or WhatsApp OTP still depends on a real provider being configured
 - Razorpay is intentionally paused until business-side verification is complete
 - There is no in-app admin password change screen yet
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
 ## Latest major work completed
+
+### Homepage and collections refresh
+
+- Replaced the old top strip text with the welcome-offer announcement
+- Added a new premium hero with headline, subtext, urgency copy, and CTA buttons
+- Added 3 main collection routes:
+  - `/collections/women`
+  - `/collections/men`
+  - `/collections/custom`
+- Reworked the product cards for tighter spacing, 2-up mobile layout, and direct add-to-cart / buy-now actions
+- Added dedicated homepage sections for `Featured Products` and `Best Selling Products`
+- Added `100+ Happy Customers` social proof and customer review cards
+- Added a new gift-experience section for packaging, wrapping, and delivered presentation
+- Added a floating WhatsApp button and stronger Instagram / WhatsApp conversion touchpoints
+- Updated the visual system toward nude / beige backgrounds, brown text, and gold-toned accents
+- Created a separate Vercel preview deployment for review before any production switch
 
 ### Repository and handoff continuity
 
@@ -112,13 +136,12 @@ This is the practical summary of the major requests and decisions that happened 
 
 - The user wanted a real backend and database security instead of a fake/demo-only flow
 - Supabase was chosen as the database/backend layer
-- Customer signup was designed to collect:
-  - customer name
-  - email
-  - phone
-  - password
-- The intended verification flow is OTP on both email and phone
-- Real self-service signup is still blocked by missing phone/WhatsApp OTP provider configuration
+- The newer storefront direction moved customer auth to a mobile-first UX:
+  - first name
+  - mobile number
+  - OTP verification
+- The UI no longer leads with email/password for storefront customer access
+- Real OTP delivery still depends on the phone/WhatsApp provider configuration
 
 ### Payments decision
 
@@ -244,7 +267,7 @@ See:
 
 ### OTP signup blocker
 
-Customer signup cannot complete yet because phone OTP sending is not configured.
+Customer mobile OTP flows cannot fully work yet because automated phone or WhatsApp OTP sending is not configured.
 
 Observed live API response:
 
@@ -253,8 +276,8 @@ Observed live API response:
 What this means:
 
 - Browsing works
-- Login works for existing customers
-- New customer self-service signup is blocked until a real provider is connected
+- The new mobile-first login and signup UI is in place
+- Real customer OTP delivery is blocked until a real provider is connected
 
 ### Recommended OTP fix
 

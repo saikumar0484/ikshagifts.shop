@@ -40,47 +40,45 @@
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
 
-  --shadow-soft: 0 20px 60px -20px color-mix(in oklab, var(--clay) 25%, transparent);
-  --shadow-card: 0 8px 30px -10px color-mix(in oklab, var(--clay) 18%, transparent);
+  --shadow-soft: 0 20px 60px -20px color-mix(in oklab, var(--clay) 22%, transparent);
+  --shadow-card: 0 8px 30px -10px color-mix(in oklab, var(--clay) 14%, transparent);
 }
 
 :root {
   --radius: 1rem;
 
-  /* Warm cozy crochet palette */
-  --background: oklch(0.975 0.015 70);          /* warm cream */
-  --foreground: oklch(0.28 0.04 40);            /* deep warm brown */
+  --background: oklch(0.97 0.012 72);
+  --foreground: oklch(0.25 0.025 38);
 
-  --card: oklch(0.99 0.008 80);
-  --card-foreground: oklch(0.28 0.04 40);
+  --card: oklch(0.985 0.008 76);
+  --card-foreground: oklch(0.25 0.025 38);
 
-  --popover: oklch(0.99 0.008 80);
-  --popover-foreground: oklch(0.28 0.04 40);
+  --popover: oklch(0.985 0.008 76);
+  --popover-foreground: oklch(0.25 0.025 38);
 
-  --primary: oklch(0.48 0.09 35);               /* terracotta brown */
-  --primary-foreground: oklch(0.97 0.012 75);
+  --primary: oklch(0.33 0.045 35);
+  --primary-foreground: oklch(0.98 0.006 75);
 
-  --secondary: oklch(0.93 0.025 60);            /* soft beige */
-  --secondary-foreground: oklch(0.32 0.05 40);
+  --secondary: oklch(0.935 0.02 72);
+  --secondary-foreground: oklch(0.3 0.03 38);
 
-  --muted: oklch(0.94 0.018 65);
-  --muted-foreground: oklch(0.52 0.04 45);
+  --muted: oklch(0.95 0.014 72);
+  --muted-foreground: oklch(0.48 0.02 42);
 
-  --accent: oklch(0.78 0.09 25);                /* dusty rose */
-  --accent-foreground: oklch(0.28 0.05 30);
+  --accent: oklch(0.81 0.08 82);
+  --accent-foreground: oklch(0.29 0.03 42);
 
-  --destructive: oklch(0.55 0.18 25);
+  --destructive: oklch(0.52 0.13 30);
   --destructive-foreground: oklch(0.98 0 0);
 
-  --border: oklch(0.88 0.02 60);
-  --input: oklch(0.88 0.02 60);
-  --ring: oklch(0.48 0.09 35);
+  --border: oklch(0.88 0.015 70);
+  --input: oklch(0.88 0.015 70);
+  --ring: oklch(0.33 0.045 35);
 
-  /* Custom brand tokens */
-  --cream: oklch(0.975 0.015 70);
-  --rose: oklch(0.82 0.08 20);                  /* dusty pink */
-  --clay: oklch(0.55 0.1 35);                   /* warm clay */
-  --sage: oklch(0.72 0.05 130);                 /* soft sage */
+  --cream: oklch(0.97 0.012 72);
+  --rose: oklch(0.9 0.025 78);
+  --clay: oklch(0.44 0.055 40);
+  --sage: oklch(0.8 0.03 82);
 }
 
 @layer base {

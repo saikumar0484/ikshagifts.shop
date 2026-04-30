@@ -23,7 +23,7 @@ function otpSecret() {
   return process.env.OTP_SECRET || process.env.SESSION_SECRET || "replace-this-otp-secret";
 }
 
-function normalizePhone(phone: string) {
+export function normalizePhone(phone: string) {
   const trimmed = phone.trim().replace(/\s+/g, "");
   if (!/^\+?[1-9]\d{9,14}$/.test(trimmed)) {
     throw new Error("Enter a valid phone number with country code, for example +919876543210.");
@@ -33,15 +33,11 @@ function normalizePhone(phone: string) {
 
 export function normalizeSignupInput(body: any) {
   const name = String(body.name || "").trim();
-  const email = String(body.email || "")
-    .trim()
-    .toLowerCase();
   const phone = normalizePhone(String(body.phone || ""));
-  const password = String(body.password || "");
+  const email = `${phone.replace(/[^\d]/g, "")}@mobile.ikshagifts.shop`;
+  const password = randomUUID();
 
   if (!name) throw new Error("Customer name is required.");
-  if (!email.includes("@")) throw new Error("A valid email is required.");
-  if (password.length < 6) throw new Error("Password must be at least 6 characters.");
 
   return { name, email, phone, password };
 }
@@ -50,8 +46,8 @@ export function createOtp() {
   return String(randomInt(100000, 999999));
 }
 
-export function hashOtp(otp: string, pendingId: string, channel: "email" | "phone") {
-  return createHmac("sha256", otpSecret()).update(`${pendingId}:${channel}:${otp}`).digest("hex");
+export function hashOtp(otp: string, scope: string, channel: string) {
+  return createHmac("sha256", otpSecret()).update(`${scope}:${channel}:${otp}`).digest("hex");
 }
 
 export async function createPendingSignup(input: {
@@ -59,11 +55,12 @@ export async function createPendingSignup(input: {
   email: string;
   phone: string;
   password: string;
-  emailOtp: string;
+  emailOtp?: string;
   phoneOtp: string;
 }) {
   const pendingId = randomUUID();
   const passwordData = hashPassword(input.password);
+  const emailOtp = input.emailOtp || input.phoneOtp;
   await db.insert<PendingSignup>("pending_signups", {
     id: pendingId,
     name: input.name,
@@ -71,7 +68,7 @@ export async function createPendingSignup(input: {
     phone: input.phone,
     password_hash: passwordData.passwordHash,
     salt: passwordData.salt,
-    email_otp_hash: hashOtp(input.emailOtp, pendingId, "email"),
+    email_otp_hash: hashOtp(emailOtp, pendingId, "email"),
     phone_otp_hash: hashOtp(input.phoneOtp, pendingId, "phone"),
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   });

@@ -84,18 +84,23 @@ type CommerceContextValue = {
   updateQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  login: (payload: AuthPayload) => Promise<void>;
-  requestSignupOtp: (payload: AuthPayload & { name: string; phone: string }) => Promise<void>;
-  verifySignupOtp: (payload: { emailOtp: string; phoneOtp: string }) => Promise<void>;
+  login: (payload: PhoneLoginPayload) => Promise<{ otpRequested?: boolean } | void>;
+  requestSignupOtp: (payload: PhoneSignupPayload) => Promise<void>;
+  verifySignupOtp: (payload: { otp: string }) => Promise<void>;
   logout: () => Promise<void>;
   placeOrder: () => Promise<void>;
   loadOrders: () => Promise<void>;
   getProduct: (productId: string) => Product | undefined;
 };
 
-type AuthPayload = {
-  email: string;
-  password: string;
+type PhoneLoginPayload = {
+  phone: string;
+  otp?: string;
+};
+
+type PhoneSignupPayload = {
+  name: string;
+  phone: string;
 };
 
 const CommerceContext = createContext<CommerceContextValue | null>(null);
@@ -146,7 +151,15 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
         .catch(() => undefined);
       api<{
         products: Array<
-          Product & { imageUrl?: string; image_url?: string; desc?: string; description?: string }
+          Product & {
+            imageUrl?: string;
+            image_url?: string;
+            desc?: string;
+            description?: string;
+            collection?: Product["collection"];
+            is_featured?: boolean;
+            is_best_seller?: boolean;
+          }
         >;
       }>("/api/products")
         .then((data) => {
@@ -163,6 +176,14 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
                 oldPrice: product.oldPrice ?? (product as any).old_price ?? fallback?.oldPrice,
                 rating: product.rating ?? fallback?.rating ?? 4.8,
                 delivery: product.delivery || fallback?.delivery || "Ships in 4-6 days",
+                collection: product.collection || fallback?.collection || "custom",
+                isFeatured:
+                  product.isFeatured ?? product.is_featured ?? fallback?.isFeatured ?? false,
+                isBestSeller:
+                  (product as Product & { is_best_seller?: boolean }).isBestSeller ??
+                  product.is_best_seller ??
+                  fallback?.isBestSeller ??
+                  false,
               };
             }),
           );
@@ -237,16 +258,20 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
 
   const closeAuth = () => setAuthOpen(false);
 
-  const login = async (payload: AuthPayload) => {
-    const data = await api<{ user: User }>("/api/auth/login", {
+  const login = async (payload: PhoneLoginPayload) => {
+    const data = await api<{ user?: User; otpRequested?: boolean }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    setUser(data.user);
-    setAuthOpen(false);
+    if (data.user) {
+      setUser(data.user);
+      setAuthOpen(false);
+      return;
+    }
+    return { otpRequested: data.otpRequested };
   };
 
-  const requestSignupOtp = async (payload: AuthPayload & { name: string; phone: string }) => {
+  const requestSignupOtp = async (payload: PhoneSignupPayload) => {
     const data = await api<{ pendingId: string }>("/api/auth/request-otp", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -259,7 +284,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const verifySignupOtp = async (payload: { emailOtp: string; phoneOtp: string }) => {
+  const verifySignupOtp = async (payload: { otp: string }) => {
     if (!pendingSignupId) throw new Error("Please request OTP first.");
     const data = await api<{ user: User }>("/api/auth/verify-otp", {
       method: "POST",

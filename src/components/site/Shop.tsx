@@ -1,140 +1,207 @@
 import { useMemo, useState } from "react";
-import { Heart, Search, ShoppingBag, Star } from "lucide-react";
-import { categories as fallbackCategories, formatPrice } from "@/data/products";
+import { Search, ShoppingBag, Sparkles } from "lucide-react";
+import {
+  collectionDescriptions,
+  collectionLabels,
+  formatPrice,
+  Product,
+  ProductCollection,
+} from "@/data/products";
 import { useCommerce } from "@/lib/commerce";
 import { SiteImage } from "@/components/site/SiteImage";
 
-export function Shop() {
-  const [category, setCategory] = useState("All");
-  const [query, setQuery] = useState("");
-  const { addToCart, products } = useCommerce();
+type ShopProps = {
+  collectionSlug?: ProductCollection | null;
+};
 
-  const categories = useMemo(() => {
-    const values = Array.from(new Set(products.map((product) => product.category))).filter(Boolean);
-    return values.length ? ["All", ...values] : fallbackCategories;
-  }, [products]);
+type ProductSectionProps = {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  products: Product[];
+};
 
-  const visibleProducts = useMemo(() => {
-    return products.filter((product) => {
-      if (product.isAvailable === false) return false;
-      const matchesCategory = category === "All" || product.category === category;
-      const text = `${product.name} ${product.category} ${product.desc}`.toLowerCase();
-      return matchesCategory && text.includes(query.toLowerCase());
-    });
-  }, [category, query]);
+function ProductCard({ product }: { product: Product }) {
+  const { addToCart, setCartOpen } = useCommerce();
+
+  const buyNow = () => {
+    addToCart(product.id);
+    setCartOpen(true);
+  };
 
   return (
-    <section id="shop" className="relative py-20 motion-safe:animate-fade-up md:py-28">
-      <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <div className="flex flex-col items-end justify-between gap-6 md:flex-row">
-          <div className="max-w-xl">
-            <span className="text-xs uppercase tracking-[0.25em] text-primary">The Shop</span>
-            <h2 className="mt-3 font-display text-4xl text-foreground md:text-5xl">
-              Little things, <em className="text-primary">big love</em>
-            </h2>
-          </div>
-          <p className="max-w-md text-muted-foreground">
-            Each piece is hand-stitched in small batches. Customise colours, sizes or design your
-            own before we pack it with care.
-          </p>
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.55rem] border border-border bg-card shadow-card transition-all hover:-translate-y-1 hover:shadow-soft">
+      <div className="bg-secondary/55 p-4">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-[1.25rem]">
+          <SiteImage
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            width={900}
+            height={1100}
+            containerClassName="h-full"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+          <span className="absolute left-3 top-3 rounded-full bg-card/92 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary backdrop-blur">
+            {product.tag}
+          </span>
         </div>
-
-        <div className="mt-10 grid gap-4 rounded-[1.75rem] border border-border bg-card p-4 shadow-card lg:grid-cols-[1fr_auto]">
-          <label className="flex items-center gap-3 rounded-full border border-border bg-background px-5 py-3 text-sm text-muted-foreground">
-            <Search size={18} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search bows, bouquets, charms"
-              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setCategory(item)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                  category === item
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-foreground hover:bg-secondary"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-4">
+        <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          {product.category}
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-display text-xl leading-tight text-foreground md:text-2xl">
+            {product.name}
+          </h3>
+          <div className="text-right">
+            <span className="font-display text-lg text-primary">{formatPrice(product.price)}</span>
+            {product.oldPrice && (
+              <div className="text-xs text-muted-foreground line-through">
+                {formatPrice(product.oldPrice)}
+              </div>
+            )}
           </div>
         </div>
-
-        <div id="new" className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {visibleProducts.map((product, index) => (
-            <article
-              key={product.id}
-              className="group relative flex flex-col overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-card transition-all hover:-translate-y-1 hover:shadow-soft"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="relative aspect-[4/5] overflow-hidden">
-                <SiteImage
-                  src={product.image}
-                  alt={product.name}
-                  loading="lazy"
-                  width={900}
-                  height={1100}
-                  containerClassName="h-full"
-                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <span className="absolute left-4 top-4 rounded-full bg-card/90 px-3 py-1 text-xs font-semibold text-primary backdrop-blur">
-                  {product.tag}
-                </span>
-                <button
-                  type="button"
-                  className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-card/90 text-primary backdrop-blur transition-transform hover:scale-105"
-                  aria-label={`Save ${product.name}`}
-                >
-                  <Heart size={17} />
-                </button>
-              </div>
-              <div className="flex flex-1 flex-col p-6">
-                <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{product.category}</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Star size={14} className="fill-primary text-primary" />
-                    {product.rating}
-                  </span>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-display text-2xl text-foreground">{product.name}</h3>
-                  <div className="text-right">
-                    <span className="font-display text-lg text-primary">
-                      {formatPrice(product.price)}
-                    </span>
-                    {product.oldPrice && (
-                      <div className="text-xs text-muted-foreground line-through">
-                        {formatPrice(product.oldPrice)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{product.desc}</p>
-                <div className="mt-auto pt-5">
-                  <p className="mb-3 text-xs font-medium text-muted-foreground">
-                    {product.delivery}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => addToCart(product.id)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01]"
-                  >
-                    <ShoppingBag size={16} />
-                    Add to cart
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.desc}</p>
+        <div className="mt-4 space-y-2 text-xs font-medium text-foreground/85">
+          <p>🚚 Delivery in 3–5 Days</p>
+          <p>🎁 Premium Packaging Included</p>
         </div>
+        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => addToCart(product.id)}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01]"
+          >
+            <ShoppingBag size={16} />
+            Add to Cart
+          </button>
+          <button
+            type="button"
+            onClick={buyNow}
+            className="rounded-full border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+          >
+            Buy Now
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ProductSection({ id, eyebrow, title, description, products }: ProductSectionProps) {
+  if (!products.length) return null;
+
+  return (
+    <section id={id} className="space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <span className="text-xs uppercase tracking-[0.25em] text-primary">{eyebrow}</span>
+          <h2 className="mt-3 font-display text-4xl text-foreground md:text-5xl">{title}</h2>
+        </div>
+        <p className="max-w-lg text-sm leading-7 text-muted-foreground">{description}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
       </div>
     </section>
   );
 }
+
+export function Shop({ collectionSlug = null }: ShopProps) {
+  const [query, setQuery] = useState("");
+  const { products } = useCommerce();
+
+  const availableProducts = useMemo(
+    () => products.filter((product) => product.isAvailable !== false),
+    [products],
+  );
+
+  const featuredProducts = useMemo(
+    () => availableProducts.filter((product) => product.isFeatured).slice(0, 4),
+    [availableProducts],
+  );
+
+  const bestSellingProducts = useMemo(
+    () => availableProducts.filter((product) => product.isBestSeller).slice(0, 4),
+    [availableProducts],
+  );
+
+  const collectionProducts = useMemo(() => {
+    const term = query.toLowerCase();
+    return availableProducts.filter((product) => {
+      const matchesCollection = !collectionSlug || product.collection === collectionSlug;
+      const searchable = `${product.name} ${product.category} ${product.desc}`.toLowerCase();
+      return matchesCollection && searchable.includes(term);
+    });
+  }, [availableProducts, collectionSlug, query]);
+
+  if (collectionSlug) {
+    return (
+      <section className="py-16 md:py-24">
+        <div className="mx-auto max-w-7xl px-6 md:px-10">
+          <div className="rounded-[2rem] border border-border bg-card p-6 shadow-card md:p-8">
+            <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              <Sparkles size={14} />
+              {collectionLabels[collectionSlug]}
+            </span>
+            <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="font-display text-4xl text-foreground md:text-5xl">
+                  {collectionLabels[collectionSlug]} Collection
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
+                  {collectionDescriptions[collectionSlug]}
+                </p>
+              </div>
+              <label className="flex items-center gap-3 rounded-full border border-border bg-background px-5 py-3 text-sm text-muted-foreground lg:min-w-[340px]">
+                <Search size={18} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={`Search ${collectionLabels[collectionSlug].toLowerCase()} gifts`}
+                  className="w-full bg-transparent outline-none"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {collectionProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="py-20 md:py-28">
+      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 md:px-10">
+        <ProductSection
+          id="featured-products"
+          eyebrow="Curated now"
+          title="Featured Products"
+          description="Premium personalized picks chosen for gifting moments that need a polished first impression."
+          products={featuredProducts}
+        />
+
+        <ProductSection
+          id="best-selling-products"
+          eyebrow="Loved by customers"
+          title="Best Selling Products"
+          description="These are the fastest-moving gift picks for birthdays, surprises, and custom occasion gifting."
+          products={bestSellingProducts}
+        />
+      </div>
+    </section>
+  );
+}
+

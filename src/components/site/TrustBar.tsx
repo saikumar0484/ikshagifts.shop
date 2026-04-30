@@ -1,9 +1,9 @@
 import { Gift, ShieldCheck, Truck } from "lucide-react";
 
 const items = [
-  { icon: Truck, label: "Pan India shipping" },
-  { icon: Gift, label: "Gift-ready wrapping" },
-  { icon: ShieldCheck, label: "Verified order requests" },
+  { icon: Truck, label: "Delivery in 3–5 days" },
+  { icon: Gift, label: "Premium packaging included" },
+  { icon: ShieldCheck, label: "Limited custom slots today" },
 ];
 
 export function TrustBar() {

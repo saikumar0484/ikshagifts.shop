@@ -14,8 +14,8 @@ export default async function handler(req: any, res: any) {
     await rateLimit(req, res, "auth:verify-otp", 10, 15 * 60);
     const body = await readBody(req);
     const pendingId = String(body.pendingId || "");
-    const emailOtp = String(body.emailOtp || "");
-    const phoneOtp = String(body.phoneOtp || "");
+    const emailOtp = String(body.emailOtp || body.otp || "");
+    const phoneOtp = String(body.phoneOtp || body.otp || "");
     const pending = await db.selectOne<PendingSignup>("pending_signups", { id: pendingId });
 
     if (!pending) throw new Error("OTP expired. Please request a new code.");
@@ -28,11 +28,15 @@ export default async function handler(req: any, res: any) {
       throw new Error("Too many OTP attempts. Please request a new code.");
     }
 
-    const emailMatches = hashOtp(emailOtp, pendingId, "email") === pending.email_otp_hash;
     const phoneMatches = hashOtp(phoneOtp, pendingId, "phone") === pending.phone_otp_hash;
+    const requiresEmailOtp = !pending.email.endsWith("@mobile.ikshagifts.shop");
+    const emailMatches = requiresEmailOtp
+      ? hashOtp(emailOtp, pendingId, "email") === pending.email_otp_hash
+      : true;
+
     if (!emailMatches || !phoneMatches) {
       await db.update("pending_signups", { id: pendingId }, { attempts: pending.attempts + 1 });
-      throw new Error("One or both OTP codes are incorrect.");
+      throw new Error("The OTP code is incorrect.");
     }
 
     const user = await createVerifiedUser({

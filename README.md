@@ -26,6 +26,11 @@ It includes:
 
 The store is live and usable for guest browsing, cart actions, and admin management.
 
+The project code is now also pushed to GitHub here:
+
+- Repo: `https://github.com/saikumar0484/ikshagifts.shop`
+- Default branch: `main`
+
 What is working:
 
 - Storefront UI and product catalog
@@ -45,6 +50,19 @@ What is not fully finished yet:
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
 ## Latest major work completed
+
+### Repository and handoff continuity
+
+- Installed Git on the local machine
+- Initialized this local project as a Git repository
+- Connected the local repo to `saikumar0484/ikshagifts.shop`
+- Pushed the current project codebase to GitHub on `main`
+- Updated this README so it works as the ongoing handoff file for future Codex sessions
+
+This means a future session can continue from either:
+
+- the local folder on this machine, or
+- the GitHub repository, even from another device/account, as long as the required secrets are provided again
 
 ### Brand and frontend
 
@@ -79,6 +97,80 @@ Result from the latest production build:
 - Integration secrets are encrypted before being stored in Supabase
 - Email supports a Resend-first configuration path
 - WhatsApp supports manual mode plus placeholders for Cloud API, AiSensy, and Twilio-style setups
+
+## Conversation summary
+
+This is the practical summary of the major requests and decisions that happened across the working sessions.
+
+### Brand and storefront direction
+
+- The user wanted the site to feel similar in quality and polish to `giva.co`
+- The implementation followed that premium ecommerce direction while keeping the existing warm handmade color palette of the current iksha gifts version
+- The storefront was reshaped around a soft luxury handmade feel instead of a generic template
+
+### Commerce and customer account direction
+
+- The user wanted a real backend and database security instead of a fake/demo-only flow
+- Supabase was chosen as the database/backend layer
+- Customer signup was designed to collect:
+  - customer name
+  - email
+  - phone
+  - password
+- The intended verification flow is OTP on both email and phone
+- Real self-service signup is still blocked by missing phone/WhatsApp OTP provider configuration
+
+### Payments decision
+
+- Razorpay integration was requested
+- Razorpay was intentionally skipped for now because the business account verification is still pending
+
+### Admin and business operations direction
+
+- The user wanted a proper admin dashboard for a non-technical business owner
+- The admin side was expanded to support:
+  - product management
+  - quantity/availability updates
+  - customer analytics
+  - order analytics
+  - order status tracking
+  - integration settings
+- The user also wanted the admin side on `admin.ikshagifts.shop`
+- That admin subdomain path is now live
+
+### OTP and messaging direction
+
+- The user asked about sending OTP to customer email and phone
+- The current code supports:
+  - email OTP structure through Resend-style flow
+  - phone/WhatsApp OTP structure through configurable provider logic
+- The business does not currently have AiSensy or Twilio
+- The app currently falls back to a blocked state for automated phone OTP because a real provider is still missing
+
+### Domain, deployment, and publishing direction
+
+- The storefront and admin work were deployed on Vercel
+- A separate deployment was created for the updated hero-slider version
+- The user then asked to move that deployment onto the main custom domain
+- `ikshagifts.shop` was switched to the newer deployment
+- `admin.ikshagifts.shop` was also connected for admin access
+
+### Performance direction
+
+- The user reported slow loading and asked for smoother loading and transitions
+- Performance improvements included:
+  - lazy-loading admin code
+  - deferring below-the-fold sections
+  - delaying commerce hydration until idle
+  - lighter image reveal transitions
+
+### GitHub continuity direction
+
+- The user wanted a README detailed enough to continue the project later with another Codex account
+- The user then wanted the full code pushed to GitHub
+- Git was installed locally
+- The project was connected to the GitHub repo `saikumar0484/ikshagifts.shop`
+- The current code and this README were pushed to that repository
 
 ## Architecture overview
 
@@ -222,6 +314,15 @@ Typical deploy command used from this repo:
 ```powershell
 & 'C:\Users\208X1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' 'C:\Users\208X1\Documents\New project 3\.tools\vercel-cli\node_modules\vercel\dist\vc.js' deploy --prod --yes
 ```
+
+## GitHub sync notes
+
+- Remote repo: `https://github.com/saikumar0484/ikshagifts.shop`
+- Local branch: `main`
+- Remote branch: `origin/main`
+- Git is now installed on this machine and was used to push the current state
+
+If another session continues the project from GitHub, this README should be updated again after each meaningful change or deployment.
 
 ## QA history summary
 

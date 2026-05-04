@@ -18,9 +18,6 @@ type ShopProps = {
 
 type ProductSectionProps = {
   id: string;
-  eyebrow: string;
-  title: string;
-  description: string;
   products: Product[];
 };
 
@@ -94,19 +91,11 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
-function ProductSection({ id, eyebrow, title, description, products }: ProductSectionProps) {
+function ProductSection({ id, products }: ProductSectionProps) {
   if (!products.length) return null;
 
   return (
-    <section id={id} className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-[0.25em] text-primary">{eyebrow}</span>
-          <h2 className="mt-3 font-display text-4xl text-foreground md:text-5xl">{title}</h2>
-        </div>
-        <p className="max-w-lg text-sm leading-7 text-muted-foreground">{description}</p>
-      </div>
-
+    <section id={id}>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
@@ -215,21 +204,15 @@ export function Shop({ collectionSlug = null }: ShopProps) {
   }
 
   return (
-    <section className="py-20 md:py-28">
-      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 md:px-10">
+    <section className="py-12 md:py-16">
+      <div className="mx-auto flex max-w-7xl flex-col gap-12 px-6 md:px-10">
         <ProductSection
           id="featured-products"
-          eyebrow="Curated now"
-          title="Featured Products"
-          description="Premium personalized picks chosen for gifting moments that need a polished first impression."
           products={featuredProducts}
         />
 
         <ProductSection
           id="best-selling-products"
-          eyebrow="Loved by customers"
-          title="Best Selling Products"
-          description="These are the fastest-moving gift picks for birthdays, surprises, and custom occasion gifting."
           products={bestSellingProducts}
         />
       </div>

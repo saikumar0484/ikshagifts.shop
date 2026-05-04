@@ -27,14 +27,14 @@ export function Nav() {
   const { cartCount, setCartOpen, setOrdersOpen, loadOrders, openAuth, user, logout } =
     useCommerce();
   const activeCollection = useMemo(() => {
-    const match = window.location.pathname.match(/^\/collections\/(men|custom)/);
+    const match = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
     return match?.[1] || null;
   }, []);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/92 backdrop-blur-xl">
       <div className="bg-primary px-4 py-2 text-center text-xs font-semibold tracking-wide text-primary-foreground">
-        🎉 Welcome Offer: ₹150 OFF | Free Shipping – Use Code EKSHA150
+        Welcome Offer: 150 Off + Free Shipping Use Code IKSHA150
       </div>
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4 md:px-10">
         <div className="flex items-center gap-6">

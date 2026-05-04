@@ -7,7 +7,7 @@ export type CustomerRow = {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   password_hash: string;
   salt: string;
   email_verified: boolean;
@@ -48,15 +48,17 @@ export async function createVerifiedUser(input: {
   id?: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   passwordHash: string;
   salt: string;
 }) {
   const existingEmail = await getUserByEmail(input.email);
   if (existingEmail) throw new Error("An account already exists for this email.");
 
-  const existingPhone = await getUserByPhone(input.phone);
-  if (existingPhone) throw new Error("An account already exists for this phone number.");
+  if (input.phone) {
+    const existingPhone = await getUserByPhone(input.phone);
+    if (existingPhone) throw new Error("An account already exists for this phone number.");
+  }
 
   const user = await db.insert<CustomerRow>("customers", {
     id: input.id || randomUUID(),
@@ -88,7 +90,7 @@ export function publicUser(user: CustomerRow) {
     id: user.id,
     name: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: user.phone || "",
     emailVerified: user.email_verified,
     phoneVerified: user.phone_verified,
   };

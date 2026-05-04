@@ -27,7 +27,7 @@ export function Nav() {
   const { cartCount, setCartOpen, setOrdersOpen, loadOrders, openAuth, user, logout } =
     useCommerce();
   const activeCollection = useMemo(() => {
-    const match = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
+    const match = window.location.pathname.match(/^\/collections\/(men|custom)/);
     return match?.[1] || null;
   }, []);
 
@@ -42,9 +42,7 @@ export function Nav() {
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-card font-display text-lg italic text-primary">
               IG
             </span>
-            <span className="font-display text-xl tracking-tight text-foreground">
-              iksha gifts
-            </span>
+            <span className="font-display text-xl tracking-tight text-foreground">iksha gifts</span>
           </a>
 
           <div className="group hidden md:block">
@@ -81,7 +79,9 @@ export function Nav() {
                   ))}
                 </div>
                 <div className="rounded-[1.6rem] bg-secondary/75 p-5">
-                  <p className="text-xs uppercase tracking-[0.25em] text-primary">Today&apos;s rush</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-primary">
+                    Today&apos;s rush
+                  </p>
                   <p className="mt-3 font-display text-3xl text-foreground">
                     Limited custom orders available today
                   </p>

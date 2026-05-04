@@ -6,11 +6,40 @@ import galleryTwo from "@/assets/gallery-2.jpg";
 import galleryThree from "@/assets/gallery-3.jpg";
 
 export type ProductCollection = "women" | "men" | "custom";
+export type ProductCategory = "men" | "customized_gifts";
+
+export const productCategories: Array<{
+  value: ProductCategory;
+  label: string;
+  collection: "men" | "custom";
+}> = [
+  { value: "men", label: "Men", collection: "men" },
+  { value: "customized_gifts", label: "Customized Gifts", collection: "custom" },
+];
+
+export const categoryToCollection: Record<ProductCategory, "men" | "custom"> = {
+  men: "men",
+  customized_gifts: "custom",
+};
+
+export const collectionToCategory: Partial<Record<ProductCollection, ProductCategory>> = {
+  men: "men",
+  custom: "customized_gifts",
+};
+
+export function isProductCategory(value: string): value is ProductCategory {
+  return productCategories.some((category) => category.value === value);
+}
+
+export function categoryLabel(value: string) {
+  return productCategories.find((category) => category.value === value)?.label || value;
+}
 
 export type Product = {
   id: string;
   name: string;
   category: string;
+  categorySlug?: ProductCategory;
   collection: ProductCollection;
   tag: string;
   desc: string;
@@ -123,7 +152,7 @@ export const products: Product[] = [
 export const collectionLabels: Record<ProductCollection, string> = {
   women: "Women",
   men: "Men",
-  custom: "Customize Your Gift",
+  custom: "Customized Gifts",
 };
 
 export const collectionDescriptions: Record<ProductCollection, string> = {
@@ -139,4 +168,3 @@ export function formatPrice(price: number) {
     maximumFractionDigits: 0,
   }).format(price);
 }
-

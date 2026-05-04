@@ -7,7 +7,7 @@ type CollectionNavProps = {
 export function CollectionNav({ active }: CollectionNavProps) {
   return (
     <section className="border-y border-border bg-card/70 py-5">
-      <div className="mx-auto grid max-w-7xl gap-3 px-6 md:grid-cols-3 md:px-10">
+      <div className="mx-auto grid max-w-7xl gap-3 px-6 md:grid-cols-2 md:px-10">
         {collectionNav.map((item) => {
           const isActive = active === item.slug;
           return (
@@ -35,4 +35,3 @@ export function CollectionNav({ active }: CollectionNavProps) {
     </section>
   );
 }
-

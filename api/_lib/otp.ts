@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createHmac, randomInt, randomUUID } from "node:crypto";
+import nodemailer from "nodemailer";
 import { db } from "./db.js";
 import { getIntegrationSecrets, listIntegrations } from "./integrations.js";
 import { hashPassword } from "./session.js";
@@ -9,7 +10,7 @@ export type PendingSignup = {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   password_hash: string;
   salt: string;
   email_otp_hash: string;
@@ -31,10 +32,23 @@ export function normalizePhone(phone: string) {
   return trimmed.startsWith("+") ? trimmed : `+91${trimmed}`;
 }
 
+export function normalizeEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("Enter a valid email address.");
+  }
+  return normalized;
+}
+
+export function normalizeOptionalPhone(phone: string) {
+  const trimmed = phone.trim();
+  return trimmed ? normalizePhone(trimmed) : null;
+}
+
 export function normalizeSignupInput(body: any) {
   const name = String(body.name || "").trim();
-  const phone = normalizePhone(String(body.phone || ""));
-  const email = `${phone.replace(/[^\d]/g, "")}@mobile.ikshagifts.shop`;
+  const email = normalizeEmail(String(body.email || ""));
+  const phone = normalizeOptionalPhone(String(body.phone || ""));
   const password = randomUUID();
 
   if (!name) throw new Error("Customer name is required.");
@@ -53,7 +67,7 @@ export function hashOtp(otp: string, scope: string, channel: string) {
 export async function createPendingSignup(input: {
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   password: string;
   emailOtp?: string;
   phoneOtp: string;
@@ -75,7 +89,56 @@ export async function createPendingSignup(input: {
   return pendingId;
 }
 
+function htmlEscape(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+async function sendSmtpOtp(email: string, otp: string, name = "there") {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const fromEmail = process.env.SMTP_FROM || user;
+
+  if (!host || !user || !pass || !fromEmail) return false;
+
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = String(process.env.SMTP_SECURE ?? "true").toLowerCase() !== "false";
+  const fromName = process.env.SMTP_FROM_NAME || process.env.OTP_EMAIL_FROM_NAME || "iksha gifts";
+  const safeName = htmlEscape(name);
+  const safeOtp = htmlEscape(otp);
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+
+  await transporter.sendMail({
+    from: `"${fromName.replaceAll('"', "")}" <${fromEmail}>`,
+    to: email,
+    subject: "Welcome to iksha gifts - verify your account",
+    text: `Welcome to iksha gifts, ${name}. Your OTP is ${otp}. This code expires in 10 minutes.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#241f1a">
+        <h2 style="margin:0 0 12px">Welcome to iksha gifts, ${safeName}</h2>
+        <p>Thank you for creating your account. Use this OTP to finish your signup:</p>
+        <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:18px 0">${safeOtp}</p>
+        <p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>
+      </div>
+    `,
+  });
+  return true;
+}
+
 export async function sendEmailOtp(email: string, otp: string) {
+  const sentBySmtp = await sendSmtpOtp(email, otp);
+  if (sentBySmtp) return;
+
   const integrations = await listIntegrations().catch(() => []);
   const emailIntegration = integrations.find((item) => item.key === "email");
   const emailSecrets: Record<string, string> = await getIntegrationSecrets("email").catch(
@@ -89,7 +152,11 @@ export async function sendEmailOtp(email: string, otp: string) {
       "onboarding@resend.dev",
   );
   const from = fromEmail.includes("<") ? fromEmail : `${fromName} <${fromEmail}>`;
-  if (!apiKey) throw new Error("Email OTP provider is not configured. Set RESEND_API_KEY.");
+  if (!apiKey) {
+    throw new Error(
+      "Email OTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM for your personal mailbox.",
+    );
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",

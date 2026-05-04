@@ -36,12 +36,18 @@ const Footer = lazy(() =>
 
 export function App() {
   const isAdminHost = window.location.hostname.startsWith("admin.");
-  const collectionMatch = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
+  const collectionMatch = window.location.pathname.match(/^\/collections\/(men|custom)/);
   const activeCollection = (collectionMatch?.[1] as "women" | "men" | "custom" | undefined) || null;
 
   if (isAdminHost || window.location.pathname.startsWith("/admin")) {
     return (
-      <Suspense fallback={<div className="grid min-h-screen place-items-center bg-background text-foreground">Loading admin...</div>}>
+      <Suspense
+        fallback={
+          <div className="grid min-h-screen place-items-center bg-background text-foreground">
+            Loading admin...
+          </div>
+        }
+      >
         <AdminDashboard />
       </Suspense>
     );

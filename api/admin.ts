@@ -10,7 +10,7 @@ import {
   getPrimaryAdminUser,
   markAdminLogin,
 } from "./_lib/admin.js";
-import { ProductRow } from "./_lib/catalog.js";
+import { categoryLabel, isProductCategory, ProductRow } from "./_lib/catalog.js";
 import { db } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
 import { listIntegrations, saveIntegration } from "./_lib/integrations.js";
@@ -37,6 +37,15 @@ type OrderRow = {
   tracking_number: string | null;
   estimated_delivery: string | null;
   status_history: unknown[];
+  created_at: string;
+};
+
+type InboxMessageRow = {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  is_read: boolean;
   created_at: string;
 };
 
@@ -71,10 +80,14 @@ function productBody(body: any) {
   const name = safeString(body.name, 120);
   if (!name) throw new Error("Product name is required.");
   const id = safeString(body.id || slugify(name), 100);
+  const category = safeString(body.category || "", 80);
+  if (!isProductCategory(category)) {
+    throw new Error("Choose Men or Customized Gifts for the product category.");
+  }
   return {
     id,
     name,
-    category: safeString(body.category || "Gifts", 80),
+    category,
     tag: safeString(body.tag || "New", 60),
     description: safeString(body.description || body.desc, 500),
     image_url: safeString(body.imageUrl || body.image_url, 500) || null,
@@ -195,10 +208,25 @@ export default async function handler(req: any, res: any) {
       if (!method(req, res, ["GET", "POST", "PATCH", "DELETE"])) return;
       await rateLimit(req, res, `admin:products:${req.method.toLowerCase()}`, 80, 15 * 60);
       if (req.method === "GET") {
-        const products = await db.list<ProductRow>("products", {
-          order: "sort_order.asc,name.asc",
+        const category = safeString(req.query?.category || "", 80);
+        if (category && !isProductCategory(category)) {
+          throw new Error("Unknown product category.");
+        }
+        const products = category
+          ? await db.selectMany<ProductRow>(
+              "products",
+              { category },
+              { order: "sort_order.asc,name.asc" },
+            )
+          : await db.list<ProductRow>("products", {
+              order: "sort_order.asc,name.asc",
+            });
+        json(res, 200, {
+          products: products.map((product) => ({
+            ...product,
+            category_label: categoryLabel(product.category),
+          })),
         });
-        json(res, 200, { products });
         return;
       }
       assertSameOrigin(req);
@@ -221,6 +249,35 @@ export default async function handler(req: any, res: any) {
             )
           : await db.update<ProductRow>("products", { id: payload.id }, payload);
       json(res, 200, { product });
+      return;
+    }
+
+    if (action === "inbox") {
+      if (!method(req, res, ["GET", "PATCH", "DELETE"])) return;
+      await rateLimit(req, res, `admin:inbox:${req.method.toLowerCase()}`, 80, 15 * 60);
+      if (req.method === "GET") {
+        const messages = await db.list<InboxMessageRow>("inbox_messages", {
+          order: "created_at.desc",
+        });
+        json(res, 200, { messages });
+        return;
+      }
+      assertSameOrigin(req);
+      requireJson(req);
+      const body = await readBody(req);
+      const id = safeString(body.id, 100);
+      if (!id) throw new Error("Message id is required.");
+      if (req.method === "DELETE") {
+        await db.delete("inbox_messages", { id });
+        json(res, 200, { ok: true });
+        return;
+      }
+      const message = await db.update<InboxMessageRow>(
+        "inbox_messages",
+        { id },
+        { is_read: Boolean(body.isRead ?? body.is_read) },
+      );
+      json(res, 200, { message });
       return;
     }
 

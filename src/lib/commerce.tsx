@@ -7,7 +7,13 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Product, products } from "@/data/products";
+import {
+  categoryLabel,
+  categoryToCollection,
+  isProductCategory,
+  Product,
+  products,
+} from "@/data/products";
 
 type User = {
   id: string;
@@ -84,8 +90,8 @@ type CommerceContextValue = {
   updateQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  login: (payload: PhoneLoginPayload) => Promise<{ otpRequested?: boolean } | void>;
-  requestSignupOtp: (payload: PhoneSignupPayload) => Promise<void>;
+  login: (payload: EmailLoginPayload) => Promise<{ otpRequested?: boolean } | void>;
+  requestSignupOtp: (payload: EmailSignupPayload) => Promise<void>;
   verifySignupOtp: (payload: { otp: string }) => Promise<void>;
   logout: () => Promise<void>;
   placeOrder: () => Promise<void>;
@@ -93,14 +99,15 @@ type CommerceContextValue = {
   getProduct: (productId: string) => Product | undefined;
 };
 
-type PhoneLoginPayload = {
-  phone: string;
+type EmailLoginPayload = {
+  email: string;
   otp?: string;
 };
 
-type PhoneSignupPayload = {
+type EmailSignupPayload = {
   name: string;
-  phone: string;
+  email: string;
+  phone?: string;
 };
 
 const CommerceContext = createContext<CommerceContextValue | null>(null);
@@ -154,9 +161,12 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
           Product & {
             imageUrl?: string;
             image_url?: string;
+            categorySlug?: string;
             desc?: string;
             description?: string;
             collection?: Product["collection"];
+            old_price?: number | null;
+            isBestSeller?: boolean;
             is_featured?: boolean;
             is_best_seller?: boolean;
           }
@@ -167,23 +177,31 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
           setManagedProducts(
             data.products.map((product) => {
               const fallback = products.find((item) => item.id === product.id);
+              const dbCategory = product.categorySlug || product.category;
+              const managedCategory = isProductCategory(dbCategory) ? dbCategory : null;
               return {
                 ...product,
-                category: product.category || fallback?.category || "Gifts",
+                category: managedCategory
+                  ? categoryLabel(managedCategory)
+                  : product.category || fallback?.category || "Gifts",
+                categorySlug: managedCategory || fallback?.categorySlug,
                 tag: product.tag || fallback?.tag || "New",
                 desc: product.desc || product.description || fallback?.desc || "",
-                image: product.imageUrl || product.image_url || fallback?.image || products[0].image,
-                oldPrice: product.oldPrice ?? (product as any).old_price ?? fallback?.oldPrice,
+                image:
+                  product.imageUrl || product.image_url || fallback?.image || products[0].image,
+                oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,
                 rating: product.rating ?? fallback?.rating ?? 4.8,
                 delivery: product.delivery || fallback?.delivery || "Ships in 4-6 days",
-                collection: product.collection || fallback?.collection || "custom",
+                collection:
+                  product.collection ||
+                  (managedCategory
+                    ? categoryToCollection[managedCategory]
+                    : fallback?.collection) ||
+                  "custom",
                 isFeatured:
                   product.isFeatured ?? product.is_featured ?? fallback?.isFeatured ?? false,
                 isBestSeller:
-                  (product as Product & { is_best_seller?: boolean }).isBestSeller ??
-                  product.is_best_seller ??
-                  fallback?.isBestSeller ??
-                  false,
+                  product.isBestSeller ?? product.is_best_seller ?? fallback?.isBestSeller ?? false,
               };
             }),
           );
@@ -193,8 +211,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
 
     const idleWindow = window as IdleWindow;
     const idleId = idleWindow.requestIdleCallback?.(hydrateCommerce);
-    const timeoutId =
-      idleId === undefined ? window.setTimeout(hydrateCommerce, 180) : undefined;
+    const timeoutId = idleId === undefined ? window.setTimeout(hydrateCommerce, 180) : undefined;
 
     return () => {
       if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);

@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Sparkles } from "lucide-react";
 import {
+  categoryLabel,
   collectionDescriptions,
   collectionLabels,
+  collectionToCategory,
   formatPrice,
   Product,
   ProductCollection,
@@ -116,7 +118,36 @@ function ProductSection({ id, eyebrow, title, description, products }: ProductSe
 
 export function Shop({ collectionSlug = null }: ShopProps) {
   const [query, setQuery] = useState("");
+  const [collectionProductsFromDb, setCollectionProductsFromDb] = useState<Product[] | null>(null);
   const { products } = useCommerce();
+
+  useEffect(() => {
+    const category = collectionSlug ? collectionToCategory[collectionSlug] : null;
+    if (!category) {
+      setCollectionProductsFromDb(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/products?category=${category}`, {
+      credentials: "include",
+      signal: controller.signal,
+    })
+      .then((response) => response.json())
+      .then((data: { products?: Product[] }) => {
+        if (!Array.isArray(data.products)) return;
+        setCollectionProductsFromDb(
+          data.products.map((product) => ({
+            ...product,
+            category: categoryLabel(product.categorySlug || product.category),
+            collection: collectionSlug,
+          })),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [collectionSlug]);
 
   const availableProducts = useMemo(
     () => products.filter((product) => product.isAvailable !== false),
@@ -135,12 +166,13 @@ export function Shop({ collectionSlug = null }: ShopProps) {
 
   const collectionProducts = useMemo(() => {
     const term = query.toLowerCase();
-    return availableProducts.filter((product) => {
+    const source = collectionProductsFromDb || availableProducts;
+    return source.filter((product) => {
       const matchesCollection = !collectionSlug || product.collection === collectionSlug;
       const searchable = `${product.name} ${product.category} ${product.desc}`.toLowerCase();
       return matchesCollection && searchable.includes(term);
     });
-  }, [availableProducts, collectionSlug, query]);
+  }, [availableProducts, collectionProductsFromDb, collectionSlug, query]);
 
   if (collectionSlug) {
     return (
@@ -204,4 +236,3 @@ export function Shop({ collectionSlug = null }: ShopProps) {
     </section>
   );
 }
-

@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { MessageCircleMore, Smartphone, X } from "lucide-react";
+import { Mail, MessageCircleMore, Smartphone, X } from "lucide-react";
 import { useCommerce } from "@/lib/commerce";
 
 const whatsappSupportLink =
@@ -11,6 +11,7 @@ export function AuthModal() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpRequested, setOtpRequested] = useState(false);
+  const [email, setEmail] = useState("");
 
   if (!authOpen) return null;
 
@@ -25,6 +26,7 @@ export function AuthModal() {
       if (isRegister && !otpRequested) {
         await requestSignupOtp({
           name: String(form.get("name") || ""),
+          email: String(form.get("email") || ""),
           phone: String(form.get("phone") || ""),
         });
         setOtpRequested(true);
@@ -41,7 +43,7 @@ export function AuthModal() {
 
       if (!otpRequested) {
         const result = await login({
-          phone: String(form.get("phone") || ""),
+          email: String(form.get("email") || ""),
         });
         if (result?.otpRequested) {
           setOtpRequested(true);
@@ -50,7 +52,7 @@ export function AuthModal() {
       }
 
       await login({
-        phone: String(form.get("phone") || ""),
+        email: String(form.get("email") || ""),
         otp: String(form.get("otp") || ""),
       });
       setOtpRequested(false);
@@ -72,11 +74,11 @@ export function AuthModal() {
       <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-6 shadow-soft">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-primary">Mobile account</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-primary">Email account</p>
             <h2 className="mt-1 font-display text-3xl text-foreground">
               {isRegister
                 ? otpRequested
-                  ? "Verify your mobile"
+                  ? "Verify your email"
                   : "Create your account"
                 : otpRequested
                   ? "Enter your OTP"
@@ -107,23 +109,41 @@ export function AuthModal() {
           )}
 
           <label className="block text-sm font-medium text-foreground">
-            Mobile Number
+            Email Address
             <div className="mt-2 flex items-center gap-3 rounded-2xl border border-input bg-background px-4 py-3">
-              <Smartphone size={18} className="text-primary" />
+              <Mail size={18} className="text-primary" />
               <input
                 required
-                name="phone"
-                inputMode="tel"
-                className="w-full bg-transparent text-sm outline-none"
-                placeholder="+91 98765 43210"
+                readOnly={otpRequested}
+                name="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full bg-transparent text-sm outline-none read-only:text-muted-foreground"
+                placeholder="you@example.com"
               />
             </div>
           </label>
 
+          {isRegister && !otpRequested && (
+            <label className="block text-sm font-medium text-foreground">
+              Mobile Number <span className="text-muted-foreground">(optional)</span>
+              <div className="mt-2 flex items-center gap-3 rounded-2xl border border-input bg-background px-4 py-3">
+                <Smartphone size={18} className="text-primary" />
+                <input
+                  name="phone"
+                  inputMode="tel"
+                  className="w-full bg-transparent text-sm outline-none"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+            </label>
+          )}
+
           {otpRequested && (
             <>
               <p className="rounded-2xl bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-                Enter the OTP sent to your mobile number to continue.
+                Enter the OTP sent to your email to continue.
               </p>
               <label className="block text-sm font-medium text-foreground">
                 OTP Verification
@@ -154,11 +174,11 @@ export function AuthModal() {
               ? "Please wait..."
               : isRegister
                 ? otpRequested
-                  ? "Verify Mobile OTP"
-                  : "Send Mobile OTP"
+                  ? "Verify Email OTP"
+                  : "Send Email OTP"
                 : otpRequested
                   ? "Log In with OTP"
-                  : "Continue with Mobile"}
+                  : "Continue with Email"}
           </button>
         </form>
 
@@ -185,4 +205,3 @@ export function AuthModal() {
     </div>
   );
 }
-

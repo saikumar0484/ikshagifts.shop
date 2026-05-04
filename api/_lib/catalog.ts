@@ -5,6 +5,8 @@ export type CatalogItem = {
   name: string;
   price: number;
   category?: string;
+  categorySlug?: ProductCategory;
+  collection?: "men" | "custom";
   tag?: string;
   desc?: string;
   imageUrl?: string;
@@ -15,13 +17,74 @@ export type CatalogItem = {
   isAvailable?: boolean;
 };
 
+export const productCategories = [
+  { value: "men", label: "Men", collection: "men" as const },
+  { value: "customized_gifts", label: "Customized Gifts", collection: "custom" as const },
+] as const;
+
+export type ProductCategory = (typeof productCategories)[number]["value"];
+
+export function isProductCategory(value: string): value is ProductCategory {
+  return productCategories.some((category) => category.value === value);
+}
+
+export function categoryLabel(value: string) {
+  return productCategories.find((category) => category.value === value)?.label || value;
+}
+
+export function categoryCollection(value: string) {
+  return productCategories.find((category) => category.value === value)?.collection || "custom";
+}
+
 export const fallbackCatalog: CatalogItem[] = [
-  { id: "forever-bouquet", name: "Forever Bouquet", price: 1200 },
-  { id: "sweet-pea-bow", name: "Sweet Pea Bow", price: 250 },
-  { id: "pocket-pals", name: "Pocket Pals", price: 350 },
-  { id: "blue-lily", name: "Blue Lily Stem", price: 420 },
-  { id: "bunny-charm", name: "Bunny Charm", price: 520 },
-  { id: "sunny-stem", name: "Sunny Stem", price: 480 },
+  {
+    id: "pocket-pals",
+    name: "Pocket Pals",
+    price: 350,
+    categorySlug: "men",
+    category: "Men",
+    collection: "men",
+  },
+  {
+    id: "blue-lily",
+    name: "Blue Lily Stem",
+    price: 420,
+    categorySlug: "men",
+    category: "Men",
+    collection: "men",
+  },
+  {
+    id: "forever-bouquet",
+    name: "Forever Bouquet",
+    price: 1200,
+    categorySlug: "customized_gifts",
+    category: "Customized Gifts",
+    collection: "custom",
+  },
+  {
+    id: "sweet-pea-bow",
+    name: "Sweet Pea Bow",
+    price: 250,
+    categorySlug: "customized_gifts",
+    category: "Customized Gifts",
+    collection: "custom",
+  },
+  {
+    id: "bunny-charm",
+    name: "Bunny Charm",
+    price: 520,
+    categorySlug: "customized_gifts",
+    category: "Customized Gifts",
+    collection: "custom",
+  },
+  {
+    id: "sunny-stem",
+    name: "Sunny Stem",
+    price: 480,
+    categorySlug: "customized_gifts",
+    category: "Customized Gifts",
+    collection: "custom",
+  },
 ];
 
 export type CartLine = {
@@ -52,7 +115,9 @@ export function normalizeProduct(row: ProductRow): CatalogItem {
   return {
     id: row.id,
     name: row.name,
-    category: row.category,
+    category: categoryLabel(row.category),
+    categorySlug: isProductCategory(row.category) ? row.category : "customized_gifts",
+    collection: categoryCollection(row.category),
     tag: row.tag,
     desc: row.description,
     imageUrl: row.image_url || undefined,
@@ -65,14 +130,24 @@ export function normalizeProduct(row: ProductRow): CatalogItem {
   };
 }
 
-export async function getCatalog() {
+export async function getCatalog(category?: ProductCategory) {
   try {
-    const rows = await db.list<ProductRow>("products", { order: "sort_order.asc,name.asc" });
+    const rows = category
+      ? await db.selectMany<ProductRow>(
+          "products",
+          { category },
+          { order: "sort_order.asc,name.asc" },
+        )
+      : await db.list<ProductRow>("products", { order: "sort_order.asc,name.asc" });
     if (rows.length) return rows.map(normalizeProduct);
   } catch {
-    return fallbackCatalog;
+    return category
+      ? fallbackCatalog.filter((product) => product.categorySlug === category)
+      : fallbackCatalog;
   }
-  return fallbackCatalog;
+  return category
+    ? fallbackCatalog.filter((product) => product.categorySlug === category)
+    : fallbackCatalog;
 }
 
 export async function priceCart(items: CartLine[]) {

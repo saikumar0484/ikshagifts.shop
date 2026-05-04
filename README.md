@@ -20,6 +20,8 @@ It includes:
 - A public storefront with product browsing, category filtering, search, cart, legal policies, and order-request flow
 - A customer account system using server-side API routes and Supabase tables
 - An admin dashboard on the `admin.` subdomain
+- Admin inbox management for customer contact messages
+- Category-based product management with fixed `men` and `customized_gifts` product categories
 - Supabase-backed products, customers, orders, sessions, pending signups, rate limits, integrations, admin users, and admin sessions
 - WhatsApp and email integration settings stored in Supabase with encrypted secrets
 
@@ -46,6 +48,9 @@ What is working:
 - Customer login endpoint
 - Order tracking UI and admin order status workflow
 - Admin dashboard on `admin.ikshagifts.shop`
+- Admin inbox with read/unread and delete actions
+- Admin product workflows for adding, editing, deleting, and filtering by category
+- Storefront collections query Supabase by category, for example `/api/products?category=men`
 - DB-backed owner login for the admin dashboard
 - Supabase-backed products, customers, orders, integration settings, and admin sessions
 - Security headers via `vercel.json`
@@ -58,6 +63,60 @@ What is not fully finished yet:
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
 ## Latest major work completed
+
+### Admin inbox and category-based product management
+
+- Added a structured admin sidebar with:
+  - Dashboard
+  - Inbox
+  - Products
+  - Add Product
+  - Product List
+- Added an inbox module backed by the `inbox_messages` Supabase table
+- Added a storefront contact form that posts customer messages to `/api/inbox`
+- Added inbox actions for read/unread state and deletion
+- Reworked product management around fixed categories:
+  - `men`
+  - `customized_gifts`
+- Product add/edit now captures:
+  - product name
+  - description
+  - price
+  - image URL or uploaded image data
+  - required category
+  - stock, badge, delivery text, and availability
+- Product list now supports category filtering and edit/delete actions
+- Public product loading now supports strict category queries:
+  - `/api/products?category=men`
+  - `/api/products?category=customized_gifts`
+- Supabase schema now includes:
+  - category check constraint for `products.category`
+  - category indexes for product collection queries
+  - `inbox_messages` table and inbox indexes
+
+### Setup and deployment notes
+
+Required Vercel/Supabase environment variables:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SESSION_SECRET`
+- `ADMIN_PASSWORD` or `ADMIN_API_KEY` for initial owner setup flows
+- Optional integration variables depend on the email/WhatsApp providers configured in the admin dashboard
+
+Local build check:
+
+```powershell
+npm install
+npm run build
+```
+
+Vercel deployment:
+
+1. Link the Vercel project to this repository.
+2. Add the environment variables above in Vercel Project Settings.
+3. Run `supabase/schema.sql` against the Supabase project before first production use.
+4. Deploy with Vercel. The project uses Vite and the existing `vercel.json` API route setup.
 
 ### Visual-first hero refinement
 
@@ -232,12 +291,12 @@ Important routes:
 
 Important server helpers:
 
-- [api/_lib/session.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/session.ts>)
-- [api/_lib/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/admin.ts>)
-- [api/_lib/otp.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/otp.ts>)
-- [api/_lib/integrations.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/integrations.ts>)
-- [api/_lib/security.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/security.ts>)
-- [api/_lib/db.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/db.ts>)
+- [api/\_lib/session.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/session.ts>)
+- [api/\_lib/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/admin.ts>)
+- [api/\_lib/otp.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/otp.ts>)
+- [api/\_lib/integrations.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/integrations.ts>)
+- [api/\_lib/security.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/security.ts>)
+- [api/\_lib/db.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/db.ts>)
 
 ### Database
 
@@ -401,7 +460,7 @@ If a future session needs to continue this project, start with this order:
 
 1. Read this README fully
 2. Check [src/App.tsx](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/src/App.tsx>) and [src/lib/commerce.tsx](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/src/lib/commerce.tsx>) for current storefront behavior
-3. Check [api/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/admin.ts>) and [api/_lib/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/admin.ts>) for owner login behavior
+3. Check [api/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/admin.ts>) and [api/\_lib/admin.ts](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/api/_lib/admin.ts>) for owner login behavior
 4. Check [supabase/schema.sql](</C:/Users/208X1/Documents/New project/iksha-gifts-supabase-commerce/supabase/schema.sql>) for the live table model
 5. Read local ignored files only if running on the same machine and only if needed
 6. Test the live URLs before making risky changes

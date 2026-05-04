@@ -99,6 +99,58 @@ Important notes:
 - `package.json` now references `nodemailer`. Local `npm` was not available in the shell PATH, so run `npm install` from a machine/account with npm before using `npm ci`.
 - Phone is now optional in `customers` and `pending_signups`; run the updated `supabase/schema.sql` before testing signup.
 
+## Checkpoint 3 - Storefront Offer Banner And Product Layout Cleanup
+
+Status: Code changes committed locally and ready to continue from another Codex account.
+
+Date: 2026-05-04
+
+Goal:
+
+- Update the top storefront offer text to the exact wording requested by the user.
+- Remove the extra introductory shop text block from the product area so the cards move upward.
+- Avoid touching unrelated admin, auth, database, or email-routing code.
+
+What changed:
+
+- Updated the top announcement bar copy in `src/components/site/Nav.tsx` to:
+
+```text
+Welcome Offer: 150 Off + Free Shipping Use Code IKSHA150
+```
+
+- Fixed the storefront collection matching regex in `src/components/site/Nav.tsx` so it includes:
+  - `women`
+  - `men`
+  - `custom`
+
+- Simplified `src/components/site/Shop.tsx` by removing the extra top product-section heading and descriptive copy block.
+- Pulled the product grids higher by tightening the outer section spacing.
+
+Files changed in this checkpoint:
+
+- `src/components/site/Nav.tsx`
+- `src/components/site/Shop.tsx`
+
+Current commit for this checkpoint:
+
+```text
+c8212b1 Tighten storefront hero and product layout
+```
+
+Verification:
+
+```powershell
+& 'C:\Users\208X1\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' '.\node_modules\vite\bin\vite.js' build
+```
+
+Result: Passed.
+
+Important scope note:
+
+- This checkpoint intentionally changes only the storefront nav banner and the storefront product layout section.
+- It does not change admin dashboard logic, SMTP setup, Cloudflare setup, Supabase schema, or inbox behavior.
+
 ## Safe Resume Steps For Another Codex Account
 
 1. Open the project folder above.
@@ -109,11 +161,18 @@ Important notes:
 git status --short
 ```
 
-4. Run the frontend build command listed above.
-5. Configure SMTP and Supabase environment variables in Vercel.
-6. Apply `supabase/schema.sql` in Supabase.
-7. Test signup with a real email address.
-8. Deploy a new Vercel preview only after signup OTP succeeds end to end.
+4. Run `git log --oneline --decorate -5` and confirm the latest storefront checkpoint commit is:
+
+```text
+c8212b1 Tighten storefront hero and product layout
+```
+
+5. Run the frontend build command listed above.
+6. If continuing storefront work only, start from `src/components/site/Nav.tsx` and `src/components/site/Shop.tsx`.
+7. If continuing auth or admin work, review Checkpoint 1 and Checkpoint 2 before editing backend code.
+8. Configure SMTP and Supabase environment variables in Vercel only when resuming the email-auth track.
+9. Apply `supabase/schema.sql` in Supabase only when resuming backend database work.
+10. Deploy a new Vercel preview or production build only after confirming the intended track of work.
 
 ## Current Known Risks
 

@@ -48,7 +48,7 @@ What is working:
   - floating WhatsApp CTA
 - Cart drawer now scrolls inside its own panel so every checkout field remains reachable on laptop and mobile screens
 - Cart quantity controls now respect admin-managed product stock and disable the plus button at the available quantity
-- Supabase product rows with old `via.placeholder.com` image URLs are automatically replaced with built-in local placeholders so failed external image requests do not break the storefront
+- Supabase product rows with old `via.placeholder.com` image URLs are automatically replaced with built-in local placeholders in the API and storefront so failed external image requests do not break the site
 - Cart drawer and guest checkout gate
 - Customer login endpoint
 - Order tracking UI and admin order status workflow

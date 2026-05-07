@@ -45,6 +45,15 @@ function placeholderImage(label: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+function isBlockedPlaceholderImage(value?: string | null) {
+  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+}
+
+function normalizeImageUrl(row: ProductRow) {
+  if (row.image_url && !isBlockedPlaceholderImage(row.image_url)) return row.image_url;
+  return placeholderImage(row.name || "Gift");
+}
+
 export const fallbackCatalog: CatalogItem[] = [
   {
     id: "bracelet",
@@ -250,7 +259,7 @@ export function normalizeProduct(row: ProductRow): CatalogItem {
     collection: categoryCollection(row.category),
     tag: row.tag,
     desc: row.description,
-    imageUrl: row.image_url || undefined,
+    imageUrl: normalizeImageUrl(row),
     price: Number(row.price) || 0,
     oldPrice: row.old_price,
     rating: Number(row.rating) || 4.8,

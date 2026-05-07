@@ -1489,12 +1489,13 @@ What changed:
 - Updated `src/data/products.ts` to export the built-in local SVG placeholder generator.
 - Updated `src/lib/commerce.tsx` so Supabase product rows using `via.placeholder.com` fall back to local generated placeholders before rendering.
 - Updated `src/components/site/Shop.tsx` with the same image fallback for collection-specific API fetches.
+- Updated `api/_lib/catalog.ts` so `/api/products` also normalizes blocked placeholder image URLs before returning product data.
 
 Verification:
 
 ```powershell
 node .\node_modules\typescript\bin\tsc --noEmit
-node .\node_modules\eslint\bin\eslint.js src\data\products.ts src\lib\commerce.tsx src\components\site\Shop.tsx
+node .\node_modules\eslint\bin\eslint.js api\_lib\catalog.ts src\data\products.ts src\lib\commerce.tsx src\components\site\Shop.tsx
 node .\node_modules\vite\bin\vite.js build
 ```
 

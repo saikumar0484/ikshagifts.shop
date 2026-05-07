@@ -12,7 +12,7 @@ type IntegrationRow = {
 };
 
 export type IntegrationView = {
-  key: "email" | "whatsapp";
+  key: "email" | "whatsapp" | "razorpay";
   label: string;
   provider: string;
   enabled: boolean;
@@ -51,6 +51,20 @@ const defaultIntegrations: Record<IntegrationView["key"], Omit<IntegrationView, 
       webhookUrl: "https://ikshagifts.shop/api/whatsapp/webhook",
       orderTemplate:
         "Hi {{name}}, your iksha gifts order {{orderId}} is now {{status}}. Thank you for supporting handmade gifts.",
+    },
+    updatedAt: null,
+  },
+  razorpay: {
+    key: "razorpay",
+    label: "Razorpay payments",
+    provider: "razorpay",
+    enabled: false,
+    status: "needs_setup",
+    publicConfig: {
+      mode: "test",
+      keyId: "",
+      businessName: "iksha gifts",
+      webhookSecretConfigured: "false",
     },
     updatedAt: null,
   },
@@ -107,6 +121,16 @@ function normalizePublicConfig(key: IntegrationView["key"], body: Record<string,
     };
   }
 
+  if (key === "razorpay") {
+    const mode = safeString(body.mode || "test", 12);
+    return {
+      mode: mode === "live" ? "live" : "test",
+      keyId: safeString(body.keyId, 120),
+      businessName: safeString(body.businessName || "iksha gifts", 80),
+      webhookSecretConfigured: safeString(body.webhookSecretConfigured || "false", 12),
+    };
+  }
+
   return {
     businessPhone: safeString(body.businessPhone, 30),
     defaultCountryCode: safeString(body.defaultCountryCode || "+91", 8),
@@ -128,6 +152,9 @@ function statusFor(
   if (key === "whatsapp" && provider === "manual") return "manual";
   if (key === "whatsapp" && provider === "whatsapp_cloud") {
     return secrets.apiToken && secrets.senderId ? "ready" : "needs_setup";
+  }
+  if (key === "razorpay") {
+    return secrets.keySecret ? "ready" : "needs_setup";
   }
   return Object.values(secrets || {}).some(Boolean) ? "ready" : "needs_setup";
 }
@@ -163,7 +190,9 @@ export async function getIntegrationSecrets(key: IntegrationView["key"]) {
 
 export async function saveIntegration(body: Record<string, unknown>) {
   const key = safeString(body.key, 40) as IntegrationView["key"];
-  if (key !== "email" && key !== "whatsapp") throw new Error("Unknown integration.");
+  if (key !== "email" && key !== "whatsapp" && key !== "razorpay") {
+    throw new Error("Unknown integration.");
+  }
 
   const existing = await db.selectOne<IntegrationRow>("integration_settings", { key });
   const provider = safeString(body.provider || defaultIntegrations[key].provider, 40);

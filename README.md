@@ -72,6 +72,12 @@ What is not fully finished yet:
   - `Webhook verify token`
   - `Meta App secret`
   - optional `WABA ID`, `Meta App ID`, and Graph API version
+- Razorpay payments are managed from Admin > Integrations:
+  - enable Razorpay payments
+  - choose test or live mode
+  - add Razorpay Key ID
+  - add Razorpay Key Secret
+  - checkout creates a Razorpay order and verifies the payment signature server-side before marking the order paid
 - Razorpay checkout code is now wired for `Pay With UPI / Cards`; real payment testing is waiting for `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - There is no in-app admin password change screen yet
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting

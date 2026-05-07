@@ -6,6 +6,7 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardList,
+  CreditCard,
   Download,
   ExternalLink,
   IndianRupee,
@@ -115,7 +116,7 @@ type Summary = {
 };
 
 type IntegrationView = {
-  key: "email" | "whatsapp";
+  key: "email" | "whatsapp" | "razorpay";
   label: string;
   provider: string;
   enabled: boolean;
@@ -2080,6 +2081,8 @@ export function AdminDashboard() {
                 secrets: {},
               };
               const isEmail = integration.key === "email";
+              const isWhatsApp = integration.key === "whatsapp";
+              const isRazorpay = integration.key === "razorpay";
               return (
                 <article
                   key={integration.key}
@@ -2088,7 +2091,13 @@ export function AdminDashboard() {
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex gap-3">
                       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-secondary text-primary">
-                        {isEmail ? <Mail size={20} /> : <Smartphone size={20} />}
+                        {isEmail ? (
+                          <Mail size={20} />
+                        ) : isRazorpay ? (
+                          <CreditCard size={20} />
+                        ) : (
+                          <Smartphone size={20} />
+                        )}
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-primary">
@@ -2100,7 +2109,9 @@ export function AdminDashboard() {
                             ? "Configured and ready for server-side use."
                             : integration.status === "manual"
                               ? "Manual WhatsApp links are active. Automated OTP needs a provider API."
-                              : "Needs provider credentials before it can send messages."}
+                              : isRazorpay
+                                ? "Add Razorpay keys to collect online payments."
+                                : "Needs provider credentials before it can send messages."}
                         </p>
                       </div>
                     </div>
@@ -2131,6 +2142,10 @@ export function AdminDashboard() {
                             <option value="resend">Resend</option>
                             <option value="smtp">SMTP</option>
                             <option value="sendgrid">SendGrid</option>
+                          </>
+                        ) : isRazorpay ? (
+                          <>
+                            <option value="razorpay">Razorpay Payment Gateway</option>
                           </>
                         ) : (
                           <>
@@ -2202,7 +2217,96 @@ export function AdminDashboard() {
                           />
                         </label>
                       </>
-                    ) : (
+                    ) : isRazorpay ? (
+                      <>
+                        <div className="rounded-2xl border border-border bg-background p-4">
+                          <h3 className="font-display text-xl">Razorpay checkout</h3>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                            Customer UPI, card, wallet, and netbanking payments open through
+                            Razorpay Checkout. The server creates the order and verifies the payment
+                            signature before marking an order paid.
+                          </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <label className="text-sm font-medium">
+                            Mode
+                            <select
+                              value={draft.publicConfig.mode || "test"}
+                              onChange={(event) =>
+                                updateIntegrationDraft(integration.key, {
+                                  publicConfig: { mode: event.target.value },
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                            >
+                              <option value="test">Test mode</option>
+                              <option value="live">Live mode</option>
+                            </select>
+                          </label>
+                          <label className="text-sm font-medium">
+                            Business name on checkout
+                            <input
+                              value={draft.publicConfig.businessName || "iksha gifts"}
+                              onChange={(event) =>
+                                updateIntegrationDraft(integration.key, {
+                                  publicConfig: { businessName: event.target.value },
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                            />
+                          </label>
+                        </div>
+                        <label className="text-sm font-medium">
+                          Razorpay Key ID
+                          <input
+                            value={draft.publicConfig.keyId || ""}
+                            placeholder="rzp_test_... or rzp_live_..."
+                            onChange={(event) =>
+                              updateIntegrationDraft(integration.key, {
+                                publicConfig: { keyId: event.target.value },
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                          />
+                        </label>
+                        <label className="text-sm font-medium">
+                          Razorpay Key Secret
+                          <input
+                            type="password"
+                            value={draft.secrets.keySecret || ""}
+                            placeholder={
+                              integration.secrets.keySecret?.configured
+                                ? `Saved: ${integration.secrets.keySecret.masked}`
+                                : "Paste Key Secret"
+                            }
+                            onChange={(event) =>
+                              updateIntegrationDraft(integration.key, {
+                                secrets: { keySecret: event.target.value },
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                          />
+                        </label>
+                        <label className="text-sm font-medium">
+                          Webhook Secret (optional)
+                          <input
+                            type="password"
+                            value={draft.secrets.webhookSecret || ""}
+                            placeholder={
+                              integration.secrets.webhookSecret?.configured
+                                ? `Saved: ${integration.secrets.webhookSecret.masked}`
+                                : "Optional for later webhook verification"
+                            }
+                            onChange={(event) =>
+                              updateIntegrationDraft(integration.key, {
+                                secrets: { webhookSecret: event.target.value },
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                          />
+                        </label>
+                      </>
+                    ) : isWhatsApp ? (
                       <>
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="text-sm font-medium">
@@ -2415,7 +2519,7 @@ export function AdminDashboard() {
                           </div>
                         </div>
                       </>
-                    )}
+                    ) : null}
 
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-background px-4 py-3 text-sm text-muted-foreground">
                       <span className="inline-flex items-center gap-2">

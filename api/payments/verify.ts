@@ -4,6 +4,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { deductProductStock, priceCart } from "../_lib/catalog.js";
 import { db } from "../_lib/db.js";
 import { json, method, readBody } from "../_lib/http.js";
+import { getIntegrationSecrets, listIntegrations } from "../_lib/integrations.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "../_lib/security.js";
 import { getSessionUser, hashPassword } from "../_lib/session.js";
 
@@ -67,10 +68,14 @@ async function getOrCreateOrderCustomer(details: any) {
 }
 
 async function createRazorpayOrder(amount: number, receipt: string) {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const { keyId, keySecret, enabled } = await razorpayConfig();
+  if (!enabled) {
+    throw new Error("Razorpay is disabled in Admin > Integrations.");
+  }
   if (!keyId || !keySecret) {
-    throw new Error("Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+    throw new Error(
+      "Razorpay is not configured. Add Key ID and Key Secret in Admin > Integrations.",
+    );
   }
 
   const response = await fetch("https://api.razorpay.com/v1/orders", {
@@ -96,6 +101,22 @@ async function createRazorpayOrder(amount: number, receipt: string) {
     throw new Error(data?.error?.description || "Razorpay order could not be created.");
   }
   return data as { id: string; amount: number; currency: "INR" };
+}
+
+async function razorpayConfig() {
+  const integrations = await listIntegrations().catch(() => []);
+  const integration = integrations.find((item) => item.key === "razorpay");
+  const publicConfig = (integration?.publicConfig || {}) as Record<string, string>;
+  const secrets: Record<string, string> = await getIntegrationSecrets("razorpay").catch(() => ({}));
+  const envKeyId = process.env.RAZORPAY_KEY_ID || "";
+  const envKeySecret = process.env.RAZORPAY_KEY_SECRET || "";
+  return {
+    enabled: Boolean(integration?.enabled) || Boolean(envKeyId && envKeySecret),
+    keyId: envKeyId || safeString(publicConfig.keyId, 120),
+    keySecret: envKeySecret || secrets.keySecret || "",
+    mode: safeString(publicConfig.mode || "test", 12),
+    businessName: safeString(publicConfig.businessName || "iksha gifts", 80),
+  };
 }
 
 async function handleCreateOrder(req: any, res: any, body: any) {
@@ -146,8 +167,11 @@ async function handleCreateOrder(req: any, res: any, body: any) {
     ],
   });
 
+  const config = await razorpayConfig();
   json(res, 201, {
-    keyId: process.env.RAZORPAY_KEY_ID,
+    keyId: config.keyId,
+    businessName: config.businessName,
+    mode: config.mode,
     appOrderId,
     razorpayOrderId: razorpayOrder.id,
     amount: razorpayOrder.amount,
@@ -160,7 +184,7 @@ async function handleCreateOrder(req: any, res: any, body: any) {
 }
 
 async function handleVerifyPayment(body: any, res: any) {
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const { keySecret } = await razorpayConfig();
   if (!keySecret) {
     json(res, 501, { error: "Razorpay secret is not configured on the server." });
     return;

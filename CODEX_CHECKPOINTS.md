@@ -979,6 +979,57 @@ Reason:
 - WhatsApp Web cannot be safely embedded in the dashboard and unofficial automation creates account/legal risk.
 - The correct customer-support workflow is the Support tab backed by official Cloud API webhooks and messages.
 
+## Checkpoint 29 - Admin Managed Razorpay Payments
+
+Status: Local implementation completed.
+
+Date: 2026-05-07
+
+Goal:
+
+- Let the owner manage Razorpay payment credentials from Admin > Integrations.
+- Enable online UPI/card payment collection through Razorpay Checkout on `ikshagifts.shop`.
+
+What changed:
+
+- Updated `api/_lib/integrations.ts`.
+- Added `razorpay` as an encrypted integration type.
+- Updated `src/admin/AdminDashboard.tsx`.
+- Admin > Integrations now shows a Razorpay card with:
+  - enabled toggle
+  - test/live mode
+  - checkout business name
+  - Razorpay Key ID
+  - encrypted Razorpay Key Secret
+  - optional webhook secret for future webhook verification
+- Updated `api/payments/verify.ts`.
+- Razorpay payment creation now reads admin-saved encrypted credentials, with Vercel env vars as fallback.
+- Existing checkout flow still creates a Razorpay order, opens Razorpay Checkout, and verifies payment signature server-side.
+- Updated `src/lib/commerce.tsx` to display the configured business name in Razorpay Checkout.
+
+Verification:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js api\_lib\integrations.ts api\payments\verify.ts src\admin\AdminDashboard.tsx src\lib\commerce.tsx
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- Vite production build passed.
+- Targeted ESLint passed with only the existing Fast Refresh warning in `src/lib/commerce.tsx`.
+
+Live testing steps:
+
+- Open Admin > Integrations.
+- Enable Razorpay payments.
+- Set mode to `test` for test card/UPI testing, or `live` only after the Razorpay account is approved.
+- Paste Razorpay Key ID and Key Secret.
+- Save.
+- Add a product to cart on the storefront and choose `Pay With UPI / Cards`.
+
 Important note:
 
 - This is a cloud preview/public Vercel alias, not the main `https://ikshagifts.shop` production website.

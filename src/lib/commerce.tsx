@@ -458,6 +458,8 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       if (details?.paymentMethod === "online") {
         const paymentOrder = await api<{
           keyId: string;
+          businessName?: string;
+          mode?: "test" | "live";
           appOrderId: string;
           razorpayOrderId: string;
           amount: number;
@@ -479,7 +481,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
             key: paymentOrder.keyId,
             amount: paymentOrder.amount,
             currency: paymentOrder.currency,
-            name: "iksha gifts",
+            name: paymentOrder.businessName || "iksha gifts",
             description: "Gift order payment",
             order_id: paymentOrder.razorpayOrderId,
             prefill: paymentOrder.customer,

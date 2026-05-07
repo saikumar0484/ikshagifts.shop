@@ -48,6 +48,7 @@ What is working:
   - floating WhatsApp CTA
 - Cart drawer now scrolls inside its own panel so every checkout field remains reachable on laptop and mobile screens
 - Cart quantity controls now respect admin-managed product stock and disable the plus button at the available quantity
+- Supabase product rows with old `via.placeholder.com` image URLs are automatically replaced with built-in local placeholders so failed external image requests do not break the storefront
 - Cart drawer and guest checkout gate
 - Customer login endpoint
 - Order tracking UI and admin order status workflow
@@ -63,6 +64,7 @@ What is working:
 - DB-backed owner login for the admin dashboard
 - Supabase-backed products, customers, orders, integration settings, and admin sessions
 - Security headers via `vercel.json`
+- CSP allows the required Razorpay checkout script and Cloudflare analytics script while keeping the rest of the policy locked down
 
 What is not fully finished yet:
 

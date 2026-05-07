@@ -1468,3 +1468,42 @@ Live smoke check:
 
 - `https://ikshagifts.shop` returned HTTP 200.
 - `https://ikshagifts.shop/api/products` returned HTTP 200 with Supabase product data.
+
+## Checkpoint 31 - CSP And Broken Placeholder Image Fix
+
+Status: Local implementation completed, ready for production deployment.
+
+Date: 2026-05-07
+
+Goal:
+
+- Fix the browser console errors reported on `https://ikshagifts.shop`.
+- Stop broken `https://via.placeholder.com/300?...` product images from rendering when those URLs are stored in Supabase.
+- Keep the security header strict while allowing Cloudflare's own analytics script.
+
+What changed:
+
+- Updated `vercel.json` Content Security Policy:
+  - added `https://static.cloudflareinsights.com` to `script-src`
+  - added `https://cloudflareinsights.com` to `connect-src`
+- Updated `src/data/products.ts` to export the built-in local SVG placeholder generator.
+- Updated `src/lib/commerce.tsx` so Supabase product rows using `via.placeholder.com` fall back to local generated placeholders before rendering.
+- Updated `src/components/site/Shop.tsx` with the same image fallback for collection-specific API fetches.
+
+Verification:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js src\data\products.ts src\lib\commerce.tsx src\components\site\Shop.tsx
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- Vite production build passed.
+- Targeted ESLint passed with only the existing Fast Refresh warning in `src/lib/commerce.tsx`.
+
+Deployment:
+
+- Pending in this checkpoint until the production Vercel deploy completes.

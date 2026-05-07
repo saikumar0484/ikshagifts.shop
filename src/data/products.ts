@@ -31,7 +31,7 @@ export function categoryLabel(value: string) {
   return productCategories.find((category) => category.value === value)?.label || value;
 }
 
-function placeholderImage(label: string) {
+export function placeholderImage(label: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><rect width="600" height="600" rx="48" fill="#f7eadc"/><circle cx="456" cy="128" r="74" fill="#d9b27c" opacity="0.55"/><circle cx="142" cy="458" r="94" fill="#b9825e" opacity="0.22"/><rect x="120" y="152" width="360" height="296" rx="34" fill="#fffaf4" stroke="#8c5b43" stroke-width="8"/><path d="M166 372c42-58 71-86 112-48 20 18 35 40 63 24 28-17 42-59 93-34" fill="none" stroke="#8c5b43" stroke-width="16" stroke-linecap="round"/><text x="300" y="504" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#4b3024">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

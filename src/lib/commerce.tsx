@@ -11,6 +11,7 @@ import {
   categoryLabel,
   categoryToCollection,
   isProductCategory,
+  placeholderImage,
   Product,
   products,
 } from "@/data/products";
@@ -185,6 +186,16 @@ type ManagedProductRow = Product & {
   sort_order?: number;
 };
 
+function isBlockedPlaceholderImage(value?: string | null) {
+  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+}
+
+function resolveProductImage(product: ManagedProductRow, fallback?: Product) {
+  const image = product.imageUrl || product.image_url || product.image;
+  if (image && !isBlockedPlaceholderImage(image)) return image;
+  return fallback?.image || placeholderImage(product.name || "Gift");
+}
+
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -252,7 +263,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
           categorySlug: managedCategory || fallback?.categorySlug,
           tag: product.tag || fallback?.tag || "New",
           desc: product.desc || product.description || fallback?.desc || "",
-          image: product.imageUrl || product.image_url || fallback?.image || products[0].image,
+          image: resolveProductImage(product, fallback),
           cartUrl:
             product.cartUrl || product.cart_url || fallback?.cartUrl || `/cart/add/${product.id}`,
           oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,

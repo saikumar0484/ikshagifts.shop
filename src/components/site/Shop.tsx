@@ -7,6 +7,7 @@ import {
   collectionLabels,
   collectionToCategory,
   formatPrice,
+  placeholderImage,
   Product,
   ProductCollection,
 } from "@/data/products";
@@ -27,6 +28,20 @@ const collectionPills: Array<{ slug: ProductCollection; href: string; label: str
   { slug: "women", href: "/collections/women", label: "Gift For Women" },
   { slug: "custom", href: "/collections/custom", label: "Customized Gifts" },
 ];
+
+function isBlockedPlaceholderImage(value?: string | null) {
+  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+}
+
+function resolveProductImage(
+  product: Product & { image_url?: string },
+  fallback?: Product,
+  fallbackProducts: Product[] = [],
+) {
+  const image = product.imageUrl || product.image_url || product.image;
+  if (image && !isBlockedPlaceholderImage(image)) return image;
+  return fallback?.image || fallbackProducts[0]?.image || placeholderImage(product.name || "Gift");
+}
 
 function ProductCard({ product }: { product: Product }) {
   const { addToCart, setCartOpen } = useCommerce();
@@ -173,12 +188,7 @@ export function Shop({ collectionSlug = null }: ShopProps) {
               collection: categoryToCollection[category],
               tag: product.tag || fallback?.tag || "New",
               desc: product.desc || fallback?.desc || "",
-              image:
-                product.imageUrl ||
-                row.image_url ||
-                product.image ||
-                fallback?.image ||
-                products[0].image,
+              image: resolveProductImage(row, fallback, products),
               cartUrl: product.cartUrl || fallback?.cartUrl || `/cart/add/${product.id}`,
               oldPrice: product.oldPrice ?? row.old_price ?? fallback?.oldPrice,
               rating: product.rating ?? fallback?.rating ?? 4.8,

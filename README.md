@@ -46,6 +46,8 @@ What is working:
   - featured and best-selling product sections
   - social proof and gift experience sections
   - floating WhatsApp CTA
+- Cart drawer now scrolls inside its own panel so every checkout field remains reachable on laptop and mobile screens
+- Cart quantity controls now respect admin-managed product stock and disable the plus button at the available quantity
 - Cart drawer and guest checkout gate
 - Customer login endpoint
 - Order tracking UI and admin order status workflow

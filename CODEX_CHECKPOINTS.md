@@ -1408,3 +1408,42 @@ Preview:
 ```text
 https://ikshagiftsshop-main.vercel.app
 ```
+
+## Checkpoint 30 - Cart Drawer Scroll And Stock Limit Guard
+
+Status: Local implementation completed, ready for production deployment.
+
+Date: 2026-05-07
+
+Goal:
+
+- Fix the cart drawer checkout form so fields below Mobile Number remain reachable.
+- Keep the cart quantity from exceeding the product stock quantity managed in the admin dashboard.
+
+What changed:
+
+- Updated `src/components/site/CartDrawer.tsx`.
+- Changed the cart drawer to use a fixed viewport-height panel with one internal scroll area.
+- Moved subtotal, coupon, total, and checkout form into that internal scroll area so Address, Pin Code, Payment, and Place Your Order stay reachable.
+- Added cart quantity stock awareness:
+  - the plus button disables when the cart quantity reaches the product `stockQuantity`
+  - the cart shows the available stock count for products coming from the admin catalog
+  - the existing `updateQuantity` and backend checkout stock validation remain in place as the final guard
+
+Verification:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js src\components\site\CartDrawer.tsx src\lib\commerce.tsx
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- Vite production build passed.
+- Targeted ESLint passed with only the existing Fast Refresh warning in `src/lib/commerce.tsx`.
+
+Deployment:
+
+- Pending in this checkpoint until the production Vercel deploy completes.

@@ -9,7 +9,7 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 - Storefront: `https://ikshagifts.shop`
 - Admin dashboard: `https://admin.ikshagifts.shop`
 - Current Codex cloud preview alias: `https://ikshagiftsshop-main.vercel.app`
-- Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-clxzq6bzp.vercel.app`
+- Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-awss0346k.vercel.app`
 - Latest preview deployment for the visual-first hero refinement: `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
 - Latest protected preview for Admin Control Center work: `https://iksha-gifts-supabase-commerce-4bwnsg42y.vercel.app`
 

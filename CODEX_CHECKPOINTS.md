@@ -1411,7 +1411,7 @@ https://ikshagiftsshop-main.vercel.app
 
 ## Checkpoint 30 - Cart Drawer Scroll And Stock Limit Guard
 
-Status: Local implementation completed, ready for production deployment.
+Status: Production deployed and pushed to GitHub.
 
 Date: 2026-05-07
 
@@ -1446,4 +1446,25 @@ Result:
 
 Deployment:
 
-- Pending in this checkpoint until the production Vercel deploy completes.
+- Production deployment completed:
+
+```text
+https://iksha-gifts-supabase-commerce-awss0346k.vercel.app
+```
+
+- Vercel aliased the deployment to:
+
+```text
+https://ikshagifts.shop
+```
+
+GitHub:
+
+```text
+d0a4e5a Fix cart drawer checkout and stock limits
+```
+
+Live smoke check:
+
+- `https://ikshagifts.shop` returned HTTP 200.
+- `https://ikshagifts.shop/api/products` returned HTTP 200 with Supabase product data.

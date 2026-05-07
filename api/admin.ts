@@ -21,6 +21,14 @@ import { db, uploadStorageObject } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
 import { listIntegrations, saveIntegration } from "./_lib/integrations.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "./_lib/security.js";
+import {
+  addSupportNote,
+  getSupportConversation,
+  listSupportWorkspace,
+  sendSupportMessage,
+  suggestSupportReplies,
+  updateSupportConversation,
+} from "./_lib/whatsapp.js";
 
 type CustomerRow = {
   id: string;
@@ -375,6 +383,64 @@ export default async function handler(req: any, res: any) {
       await rateLimit(req, res, "admin:integrations", 20, 15 * 60);
       const body = await readBody(req);
       json(res, 200, { integration: await saveIntegration(body) });
+      return;
+    }
+
+    if (action === "support") {
+      if (!method(req, res, ["GET"])) return;
+      try {
+        json(res, 200, await listSupportWorkspace());
+      } catch (error) {
+        json(res, 200, {
+          conversations: [],
+          agents: [],
+          templates: [],
+          unreadCount: 0,
+          setupRequired:
+            error instanceof Error
+              ? error.message
+              : "Support tables are not ready. Apply the Supabase schema.",
+        });
+      }
+      return;
+    }
+
+    if (action === "support-conversation") {
+      if (!method(req, res, ["GET", "PATCH"])) return;
+      if (req.method === "GET") {
+        const id = safeString(req.query?.id || "", 80);
+        json(res, 200, { conversation: await getSupportConversation(id) });
+        return;
+      }
+      assertSameOrigin(req);
+      requireJson(req);
+      const body = await readBody(req);
+      json(res, 200, { conversation: await updateSupportConversation(body) });
+      return;
+    }
+
+    if (action === "support-message") {
+      if (!method(req, res, ["POST"])) return;
+      assertSameOrigin(req);
+      requireJson(req);
+      await rateLimit(req, res, "admin:support-message", 60, 15 * 60);
+      json(res, 200, { conversation: await sendSupportMessage(await readBody(req)) });
+      return;
+    }
+
+    if (action === "support-note") {
+      if (!method(req, res, ["POST"])) return;
+      assertSameOrigin(req);
+      requireJson(req);
+      await rateLimit(req, res, "admin:support-note", 80, 15 * 60);
+      json(res, 200, { conversation: await addSupportNote(await readBody(req)) });
+      return;
+    }
+
+    if (action === "support-suggestions") {
+      if (!method(req, res, ["GET"])) return;
+      const id = safeString(req.query?.id || "", 80);
+      json(res, 200, { suggestions: await suggestSupportReplies(id) });
       return;
     }
 

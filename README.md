@@ -56,6 +56,11 @@ What is working:
   - open official WhatsApp Web QR login from the dashboard
   - search customer phone contacts from the customer database
   - open prefilled WhatsApp chat links for customer support and order updates
+- Admin Support tab now includes a policy-compliant WhatsApp Business Platform CRM module:
+  - webhook endpoint at `/api/whatsapp/webhook`
+  - official Cloud API send path using phone number ID and access token
+  - conversation inbox, search, status filters, assignment, templates, notes, order sidebar, and AI-style reply suggestions
+  - SSE update endpoint at `/api/support/stream`
 - Storefront collections query Supabase by category, for example `/api/products?category=men`
 - DB-backed owner login for the admin dashboard
 - Supabase-backed products, customers, orders, integration settings, and admin sessions
@@ -65,6 +70,12 @@ What is not fully finished yet:
 
 - Automated phone or WhatsApp OTP still depends on a real provider being configured
 - WhatsApp Web login is intentionally opened through the official WhatsApp Web tab. The dashboard does not store or automate the WhatsApp session.
+- WhatsApp Business Platform requires Meta credentials in Integrations before real sending/receiving works:
+  - `Cloud API access token`
+  - `Phone number ID`
+  - `Webhook verify token`
+  - `Meta App secret`
+  - optional `WABA ID`, `Meta App ID`, and Graph API version
 - Razorpay checkout code is now wired for `Pay With UPI / Cards`; real payment testing is waiting for `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - There is no in-app admin password change screen yet
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting

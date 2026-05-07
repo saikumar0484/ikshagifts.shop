@@ -875,6 +875,86 @@ Important note:
 
 - The official WhatsApp Web QR is opened in a separate secure browser tab. It is not embedded inside the admin page because WhatsApp Web blocks embedding and unofficial automation can create legal/account risk.
 
+## Checkpoint 27 - Official WhatsApp Business Support Module
+
+Status: Local implementation completed.
+
+Date: 2026-05-07
+
+Goal:
+
+- Build an official WhatsApp Business Platform integration for ecommerce support.
+- Avoid reverse-engineered WhatsApp Web automation, scraping, or unofficial session hijacking.
+- Give support agents a Shopify Inbox / Zendesk-style workflow inside the admin dashboard.
+
+What changed:
+
+- Added `api/_lib/whatsapp.ts`.
+- Added webhook endpoint `api/whatsapp/webhook.ts`.
+- Added SSE update endpoint `api/support/stream.ts`.
+- Extended `api/admin.ts` with support REST actions:
+  - `support`
+  - `support-conversation`
+  - `support-message`
+  - `support-note`
+  - `support-suggestions`
+- Extended `api/_lib/integrations.ts` for official WhatsApp Cloud API config:
+  - webhook URL
+  - Meta App ID
+  - WABA ID
+  - Graph API version
+  - Cloud API access token
+  - phone number ID
+  - webhook verify token
+  - Meta App secret
+- Extended `supabase/schema.sql` with:
+  - `support_agents`
+  - `whatsapp_conversations`
+  - `whatsapp_messages`
+  - `support_notes`
+  - `support_message_templates`
+- Added an admin Support tab in `src/admin/AdminDashboard.tsx`:
+  - conversation list
+  - search and status filters
+  - realtime-ish SSE refresh
+  - message thread
+  - template buttons
+  - AI-style reply suggestions
+  - assignment and status controls
+  - customer profile sidebar
+  - order history, payment status, shipping details
+  - internal notes
+- Added Docker support:
+  - `Dockerfile`
+  - `.dockerignore`
+  - `docker-compose.yml`
+
+Verification:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js src\admin\AdminDashboard.tsx src\routes\index.tsx api\_lib\whatsapp.ts api\whatsapp\webhook.ts api\support\stream.ts api\admin.ts api\_lib\integrations.ts
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- Targeted ESLint passed.
+- Vite production build passed.
+
+Important deployment notes:
+
+- Apply the new Supabase schema before using the Support tab in production.
+- Configure the WhatsApp integration in Admin > Integrations with official Meta credentials.
+- Set the Meta webhook callback URL to:
+
+```text
+https://ikshagifts.shop/api/whatsapp/webhook
+```
+
+- Use the same webhook verify token in Meta and in the admin integration settings.
+
 Important note:
 
 - This is a cloud preview/public Vercel alias, not the main `https://ikshagifts.shop` production website.

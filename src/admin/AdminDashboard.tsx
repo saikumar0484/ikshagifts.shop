@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
+  Bell,
+  Bot,
   Boxes,
   CheckCircle2,
   ClipboardList,
@@ -19,14 +21,16 @@ import {
   Pencil,
   Plug,
   Plus,
-  QrCode,
   RefreshCw,
   Save,
   Search,
+  Send,
   Settings,
   Smartphone,
+  StickyNote,
   Trash2,
   Upload,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { categoryLabel, formatPrice, productCategories, ProductCategory } from "@/data/products";
@@ -128,6 +132,73 @@ type IntegrationDraft = {
   secrets: Record<string, string>;
 };
 
+type SupportAgent = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+};
+
+type SupportTemplate = {
+  id: string;
+  key: string;
+  label: string;
+  category: string;
+  body: string;
+  whatsapp_template_name: string | null;
+  language_code: string;
+};
+
+type SupportMessage = {
+  id: string;
+  direction: "inbound" | "outbound";
+  message_type: string;
+  body: string;
+  template_name: string | null;
+  status: string;
+  created_at: string;
+};
+
+type SupportNote = {
+  id: string;
+  body: string;
+  created_at: string;
+};
+
+type SupportConversation = {
+  id: string;
+  customer_id: string | null;
+  wa_id: string;
+  customer_name: string;
+  customer_phone: string;
+  status: "open" | "pending" | "resolved";
+  assigned_agent_id: string | null;
+  unread_count: number;
+  last_message_preview: string;
+  last_message_at: string;
+  customer: CustomerRow | null;
+  agent: SupportAgent | null;
+  messages: SupportMessage[];
+  notes: SupportNote[];
+  orders: OrderRow[];
+};
+
+type SupportWorkspace = {
+  conversations: SupportConversation[];
+  agents: SupportAgent[];
+  templates: SupportTemplate[];
+  unreadCount: number;
+  setupRequired?: string;
+};
+
+const emptySupportWorkspace: SupportWorkspace = {
+  conversations: [],
+  agents: [],
+  templates: [],
+  unreadCount: 0,
+};
+
 const emptyProduct: ProductRow = {
   id: "",
   name: "",
@@ -225,6 +296,18 @@ export function AdminDashboard() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationView[]>([]);
   const [integrationDrafts, setIntegrationDrafts] = useState<Record<string, IntegrationDraft>>({});
+  const [support, setSupport] = useState<SupportWorkspace>(emptySupportWorkspace);
+  const [selectedConversationId, setSelectedConversationId] = useState("");
+  const [selectedConversation, setSelectedConversation] = useState<SupportConversation | null>(
+    null,
+  );
+  const [supportSearch, setSupportSearch] = useState("");
+  const [supportFilter, setSupportFilter] = useState<"all" | "open" | "pending" | "resolved">(
+    "all",
+  );
+  const [replyText, setReplyText] = useState("");
+  const [internalNote, setInternalNote] = useState("");
+  const [replySuggestions, setReplySuggestions] = useState<string[]>([]);
   const [productDraft, setProductDraft] = useState<ProductRow>(emptyProduct);
   const [productFilter, setProductFilter] = useState<"all" | ProductCategory>("all");
   const [productStatusFilter, setProductStatusFilter] = useState<
@@ -240,21 +323,31 @@ export function AdminDashboard() {
 
   const loadAll = async () => {
     setError("");
-    const [summaryData, productData, inboxData, orderData, customerData, integrationData] =
-      await Promise.all([
-        api<Summary>("/api/admin?action=summary"),
-        api<{ products: ProductRow[] }>("/api/admin?action=products"),
-        api<{ messages: InboxMessage[] }>("/api/admin?action=inbox"),
-        api<{ orders: OrderRow[] }>("/api/admin?action=orders"),
-        api<{ customers: CustomerRow[] }>("/api/admin?action=customers"),
-        api<{ integrations: IntegrationView[] }>("/api/admin?action=integrations"),
-      ]);
+    const [
+      summaryData,
+      productData,
+      inboxData,
+      orderData,
+      customerData,
+      integrationData,
+      supportData,
+    ] = await Promise.all([
+      api<Summary>("/api/admin?action=summary"),
+      api<{ products: ProductRow[] }>("/api/admin?action=products"),
+      api<{ messages: InboxMessage[] }>("/api/admin?action=inbox"),
+      api<{ orders: OrderRow[] }>("/api/admin?action=orders"),
+      api<{ customers: CustomerRow[] }>("/api/admin?action=customers"),
+      api<{ integrations: IntegrationView[] }>("/api/admin?action=integrations"),
+      api<SupportWorkspace>("/api/admin?action=support").catch(() => emptySupportWorkspace),
+    ]);
     setSummary(summaryData);
     setProducts(productData.products);
     setMessages(inboxData.messages);
     setOrders(orderData.orders);
     setCustomers(customerData.customers);
     setIntegrations(integrationData.integrations);
+    setSupport(supportData);
+    setSelectedConversationId((current) => current || supportData.conversations[0]?.id || "");
     setIntegrationDrafts(
       Object.fromEntries(
         integrationData.integrations.map((integration) => [
@@ -290,6 +383,24 @@ export function AdminDashboard() {
       .sort((a, b) => (b.lastOrderAt || "").localeCompare(a.lastOrderAt || ""));
   }, [contactSearch, customers]);
 
+  const filteredSupportConversations = useMemo(() => {
+    const query = supportSearch.trim().toLowerCase();
+    return support.conversations.filter((conversation) => {
+      const matchesStatus = supportFilter === "all" || conversation.status === supportFilter;
+      const searchable = [
+        conversation.customer_name,
+        conversation.customer_phone,
+        conversation.wa_id,
+        conversation.customer?.email,
+        conversation.last_message_preview,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return matchesStatus && (!query || searchable.includes(query));
+    });
+  }, [support.conversations, supportFilter, supportSearch]);
+
   useEffect(() => {
     api<{ admin: boolean }>("/api/admin?action=me")
       .then(async (data) => {
@@ -299,6 +410,37 @@ export function AdminDashboard() {
       .catch(() => undefined)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!admin || !selectedConversationId) {
+      setSelectedConversation(null);
+      setReplySuggestions([]);
+      return;
+    }
+    api<{ conversation: SupportConversation }>(
+      `/api/admin?action=support-conversation&id=${encodeURIComponent(selectedConversationId)}`,
+    )
+      .then((data) => {
+        setSelectedConversation(data.conversation);
+        return api<{ suggestions: string[] }>(
+          `/api/admin?action=support-suggestions&id=${encodeURIComponent(selectedConversationId)}`,
+        );
+      })
+      .then((data) => setReplySuggestions(data.suggestions || []))
+      .catch(() => undefined);
+  }, [admin, selectedConversationId]);
+
+  useEffect(() => {
+    if (!admin) return undefined;
+    const events = new EventSource("/api/support/stream");
+    events.addEventListener("support_update", () => {
+      api<SupportWorkspace>("/api/admin?action=support")
+        .then((data) => setSupport(data))
+        .catch(() => undefined);
+    });
+    events.onerror = () => events.close();
+    return () => events.close();
+  }, [admin]);
 
   const filteredOrders = useMemo(() => {
     const term = orderSearch.toLowerCase();
@@ -530,6 +672,65 @@ export function AdminDashboard() {
     }
   };
 
+  const updateSupportConversation = async (patch: Record<string, unknown>) => {
+    if (!selectedConversationId) return;
+    setError("");
+    try {
+      const data = await api<{ conversation: SupportConversation }>(
+        "/api/admin?action=support-conversation",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ id: selectedConversationId, ...patch }),
+        },
+      );
+      setSelectedConversation(data.conversation);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Conversation could not be updated.");
+    }
+  };
+
+  const sendSupportReply = async (templateId = "") => {
+    if (!selectedConversationId) return;
+    setError("");
+    try {
+      const data = await api<{ conversation: SupportConversation }>(
+        "/api/admin?action=support-message",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            conversationId: selectedConversationId,
+            body: templateId ? "" : replyText,
+            templateId,
+          }),
+        },
+      );
+      setSelectedConversation(data.conversation);
+      setReplyText("");
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "WhatsApp reply could not be sent.");
+    }
+  };
+
+  const addConversationNote = async () => {
+    if (!selectedConversationId || !internalNote.trim()) return;
+    setError("");
+    try {
+      const data = await api<{ conversation: SupportConversation }>(
+        "/api/admin?action=support-note",
+        {
+          method: "POST",
+          body: JSON.stringify({ conversationId: selectedConversationId, body: internalNote }),
+        },
+      );
+      setSelectedConversation(data.conversation);
+      setInternalNote("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Internal note could not be saved.");
+    }
+  };
+
   const attachProductImage = async (file: File | null) => {
     if (!file) return;
     setError("");
@@ -661,6 +862,25 @@ export function AdminDashboard() {
               {unreadMessages > 0 && (
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-foreground">
                   {unreadMessages}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("support")}
+              className={`inline-flex shrink-0 items-center justify-between gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold ${
+                tab === "support"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-foreground"
+              }`}
+            >
+              <span className="inline-flex items-center gap-3">
+                <MessageCircle size={17} />
+                Support
+              </span>
+              {support.unreadCount > 0 && (
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-foreground">
+                  {support.unreadCount}
                 </span>
               )}
             </button>
@@ -968,6 +1188,322 @@ export function AdminDashboard() {
               ) : (
                 <p className="px-5 py-8 text-sm text-muted-foreground">No customer messages yet.</p>
               )}
+            </div>
+          </section>
+        )}
+
+        {tab === "support" && (
+          <section className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatCard
+                label="Conversations"
+                value={support.conversations.length}
+                icon={MessageCircle}
+              />
+              <StatCard label="Unread WhatsApp" value={support.unreadCount} icon={Bell} />
+              <StatCard
+                label="Active agents"
+                value={support.agents.filter((agent) => agent.is_active).length}
+                icon={UserCheck}
+              />
+            </div>
+
+            {support.setupRequired && (
+              <div className="rounded-2xl border border-dashed border-primary/40 bg-card p-5 text-sm leading-6 text-muted-foreground">
+                <strong className="text-foreground">Support schema setup needed:</strong>{" "}
+                {support.setupRequired}
+              </div>
+            )}
+
+            <div className="grid min-h-[680px] overflow-hidden rounded-2xl border border-border bg-card xl:grid-cols-[340px_minmax(0,1fr)_360px]">
+              <aside className="border-b border-border xl:border-b-0 xl:border-r">
+                <div className="space-y-3 border-b border-border p-4">
+                  <label className="flex items-center gap-2 rounded-full border border-input bg-background px-4 py-2 text-sm">
+                    <Search size={16} className="text-primary" />
+                    <input
+                      value={supportSearch}
+                      onChange={(event) => setSupportSearch(event.target.value)}
+                      placeholder="Search chats"
+                      className="min-w-0 flex-1 bg-transparent outline-none"
+                    />
+                  </label>
+                  <select
+                    value={supportFilter}
+                    onChange={(event) =>
+                      setSupportFilter(
+                        event.target.value as "all" | "open" | "pending" | "resolved",
+                      )
+                    }
+                    className="w-full rounded-full border border-input bg-background px-4 py-2 text-sm outline-none"
+                  >
+                    <option value="all">All conversations</option>
+                    <option value="open">Open</option>
+                    <option value="pending">Pending</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+                <div className="max-h-[580px] overflow-y-auto">
+                  {filteredSupportConversations.map((conversation) => (
+                    <button
+                      key={conversation.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedConversationId(conversation.id);
+                        updateSupportConversation({ id: conversation.id, markRead: true });
+                      }}
+                      className={`w-full border-b border-border px-4 py-4 text-left last:border-b-0 ${
+                        selectedConversationId === conversation.id ? "bg-secondary" : "bg-card"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-display text-lg">
+                            {conversation.customer?.name || conversation.customer_name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {formatPhone(conversation.customer_phone)}
+                          </p>
+                        </div>
+                        {conversation.unread_count > 0 && (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                            {conversation.unread_count}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                        {conversation.last_message_preview || "No messages yet"}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="capitalize">{conversation.status}</span>
+                        <span>
+                          {new Date(conversation.last_message_at).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                          })}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                  {!filteredSupportConversations.length && (
+                    <div className="p-5 text-sm text-muted-foreground">
+                      No WhatsApp conversations yet.
+                    </div>
+                  )}
+                </div>
+              </aside>
+
+              <section className="flex min-h-[680px] flex-col">
+                {selectedConversation ? (
+                  <>
+                    <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.18em] text-primary">
+                          WhatsApp Business Platform
+                        </p>
+                        <h2 className="font-display text-2xl">
+                          {selectedConversation.customer?.name ||
+                            selectedConversation.customer_name}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          {formatPhone(selectedConversation.customer_phone)} -{" "}
+                          {selectedConversation.agent?.name || "Unassigned"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <select
+                          value={selectedConversation.status}
+                          onChange={(event) =>
+                            updateSupportConversation({ status: event.target.value })
+                          }
+                          className="rounded-full border border-input bg-background px-4 py-2 text-sm"
+                        >
+                          <option value="open">Open</option>
+                          <option value="pending">Pending</option>
+                          <option value="resolved">Resolved</option>
+                        </select>
+                        <select
+                          value={selectedConversation.assigned_agent_id || ""}
+                          onChange={(event) =>
+                            updateSupportConversation({ assignedAgentId: event.target.value })
+                          }
+                          className="rounded-full border border-input bg-background px-4 py-2 text-sm"
+                        >
+                          <option value="">Unassigned</option>
+                          {support.agents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-3 overflow-y-auto bg-background/50 p-4">
+                      {selectedConversation.messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${
+                            message.direction === "outbound" ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                              message.direction === "outbound"
+                                ? "bg-primary text-primary-foreground"
+                                : "border border-border bg-card text-foreground"
+                            }`}
+                          >
+                            <p>{message.body}</p>
+                            <p
+                              className={`mt-2 text-[11px] ${
+                                message.direction === "outbound"
+                                  ? "text-primary-foreground/75"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {new Date(message.created_at).toLocaleString("en-IN")} -{" "}
+                              {message.status}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {!selectedConversation.messages.length && (
+                        <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                          Select a customer conversation to start support.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border p-4">
+                      <div className="mb-3 rounded-2xl border border-border bg-background p-3">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                          <Bot size={14} />
+                          AI-assisted reply ideas
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {replySuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => setReplyText(suggestion)}
+                              className="rounded-full border border-border bg-card px-3 py-2 text-xs text-left"
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {support.templates.map((template) => (
+                          <button
+                            key={template.id}
+                            type="button"
+                            onClick={() => sendSupportReply(template.id)}
+                            className="rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-primary"
+                          >
+                            {template.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <textarea
+                          value={replyText}
+                          onChange={(event) => setReplyText(event.target.value)}
+                          placeholder="Type a support reply. Use approved templates outside the customer-service window."
+                          className="min-h-20 flex-1 rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => sendSupportReply()}
+                          className="inline-flex min-w-24 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+                        >
+                          <Send size={16} />
+                          Send
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid flex-1 place-items-center p-8 text-center text-sm text-muted-foreground">
+                    Connect WhatsApp Cloud API and wait for customer messages to arrive.
+                  </div>
+                )}
+              </section>
+
+              <aside className="border-t border-border p-5 xl:border-l xl:border-t-0">
+                {selectedConversation ? (
+                  <div className="space-y-5">
+                    <section>
+                      <p className="text-xs uppercase tracking-[0.18em] text-primary">
+                        Customer profile
+                      </p>
+                      <h3 className="mt-2 font-display text-2xl">
+                        {selectedConversation.customer?.name || selectedConversation.customer_name}
+                      </h3>
+                      <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                        <p>{formatPhone(selectedConversation.customer_phone)}</p>
+                        <p>{selectedConversation.customer?.email || "No customer email linked"}</p>
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-border bg-background p-4">
+                      <h4 className="font-semibold">Order history</h4>
+                      <div className="mt-3 space-y-3">
+                        {selectedConversation.orders.map((order) => (
+                          <div key={order.id} className="rounded-xl bg-card p-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold">{order.id}</span>
+                              <span className="text-primary">{formatPrice(order.amount)}</span>
+                            </div>
+                            <p className="mt-1 capitalize text-muted-foreground">
+                              {order.status.replaceAll("_", " ")} - {order.payment_status}
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                              {order.shipping_address || "No shipping address"}{" "}
+                              {order.pin_code ? `- ${order.pin_code}` : ""}
+                            </p>
+                            {order.tracking_number && (
+                              <p className="mt-1 text-primary">Tracking: {order.tracking_number}</p>
+                            )}
+                          </div>
+                        ))}
+                        {!selectedConversation.orders.length && (
+                          <p className="text-sm text-muted-foreground">No linked orders yet.</p>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-2xl border border-border bg-background p-4">
+                      <h4 className="mb-3 inline-flex items-center gap-2 font-semibold">
+                        <StickyNote size={16} />
+                        Internal notes
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedConversation.notes.map((note) => (
+                          <p key={note.id} className="rounded-xl bg-card p-3 text-sm leading-6">
+                            {note.body}
+                          </p>
+                        ))}
+                      </div>
+                      <textarea
+                        value={internalNote}
+                        onChange={(event) => setInternalNote(event.target.value)}
+                        placeholder="Add private support note"
+                        className="mt-3 min-h-20 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={addConversationNote}
+                        className="mt-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                      >
+                        Save note
+                      </button>
+                    </section>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No conversation selected.</p>
+                )}
+              </aside>
             </div>
           </section>
         )}
@@ -1713,6 +2249,68 @@ export function AdminDashboard() {
                             />
                           </label>
                         </div>
+                        <div className="rounded-2xl border border-border bg-background p-4">
+                          <div className="mb-3">
+                            <h3 className="font-display text-xl">Official Cloud API setup</h3>
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              Use Meta WhatsApp Business Platform credentials only. Embedded Signup
+                              can be added later after Meta Tech Provider or BSP approval.
+                            </p>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <label className="text-sm font-medium">
+                              Webhook URL
+                              <input
+                                value={
+                                  draft.publicConfig.webhookUrl ||
+                                  "https://ikshagifts.shop/api/whatsapp/webhook"
+                                }
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { webhookUrl: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-medium">
+                              Graph API version
+                              <input
+                                value={draft.publicConfig.graphVersion || "v23.0"}
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { graphVersion: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-medium">
+                              Meta App ID
+                              <input
+                                value={draft.publicConfig.appId || ""}
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { appId: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-medium">
+                              WABA ID
+                              <input
+                                value={draft.publicConfig.wabaId || ""}
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { wabaId: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                          </div>
+                        </div>
                         <label className="text-sm font-medium">
                           Order update message template
                           <textarea
@@ -1727,7 +2325,7 @@ export function AdminDashboard() {
                         </label>
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="text-sm font-medium">
-                            Provider API token
+                            Cloud API access token
                             <input
                               type="password"
                               value={draft.secrets.apiToken || ""}
@@ -1745,7 +2343,7 @@ export function AdminDashboard() {
                             />
                           </label>
                           <label className="text-sm font-medium">
-                            Sender / phone number ID
+                            Phone number ID
                             <input
                               type="password"
                               value={draft.secrets.senderId || ""}
@@ -1762,49 +2360,75 @@ export function AdminDashboard() {
                               className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
                             />
                           </label>
+                          <label className="text-sm font-medium">
+                            Webhook verify token
+                            <input
+                              type="password"
+                              value={draft.secrets.verifyToken || ""}
+                              placeholder="Create a private verification token"
+                              onChange={(event) =>
+                                updateIntegrationDraft(integration.key, {
+                                  secrets: { verifyToken: event.target.value },
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                            />
+                          </label>
+                          <label className="text-sm font-medium">
+                            Meta App secret
+                            <input
+                              type="password"
+                              value={draft.secrets.appSecret || ""}
+                              placeholder="Required for webhook signature verification"
+                              onChange={(event) =>
+                                updateIntegrationDraft(integration.key, {
+                                  secrets: { appSecret: event.target.value },
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                            />
+                          </label>
                         </div>
                         <div className="rounded-2xl border border-border bg-background p-4">
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                             <div className="flex gap-3">
                               <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-dashed border-primary/40 bg-card text-primary">
-                                <QrCode size={38} />
+                                <UserCheck size={38} />
                               </div>
                               <div>
-                                <h3 className="font-display text-xl">WhatsApp Web QR login</h3>
+                                <h3 className="font-display text-xl">
+                                  Official account onboarding
+                                </h3>
                                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                  Open the official WhatsApp Web screen, scan the QR from your
-                                  phone, then manage customer chats from the same browser session.
+                                  Connect a Meta WhatsApp Business Account, phone number ID, access
+                                  token, and webhook subscription. Use Embedded Signup only through
+                                  Meta-approved Tech Provider or BSP flows.
                                 </p>
                                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                                  For safety, this dashboard does not store your WhatsApp session or
-                                  automate WhatsApp Web. Customer contacts below open as chat links.
+                                  This module avoids WhatsApp Web automation, scraping, and session
+                                  hijacking. All sending and receiving runs through official APIs.
                                 </p>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <a
-                                href="https://web.whatsapp.com/"
+                                href="https://business.facebook.com/wa/manage/home/"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-4 py-2 text-sm font-semibold text-white"
                               >
                                 <ExternalLink size={16} />
-                                Open QR Login
+                                WhatsApp Manager
                               </a>
-                              {phoneDigits(draft.publicConfig.businessPhone || "") ? (
-                                <a
-                                  href={whatsappLink(
-                                    draft.publicConfig.businessPhone || "",
-                                    "Testing iksha gifts WhatsApp integration.",
-                                  )}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-primary"
-                                >
-                                  <MessageCircle size={16} />
-                                  Test chat
-                                </a>
-                              ) : null}
+                              <a
+                                href="https://developers.facebook.com/apps/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-primary"
+                              >
+                                <ExternalLink size={16} />
+                                Meta App
+                              </a>
                             </div>
                           </div>
                         </div>

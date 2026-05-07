@@ -134,6 +134,64 @@ create table if not exists public.integration_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.support_agents (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  role text not null default 'support',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.whatsapp_conversations (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references public.customers(id) on delete set null,
+  wa_id text not null unique,
+  customer_name text not null default 'WhatsApp customer',
+  customer_phone text not null default '',
+  status text not null default 'open' check (status in ('open', 'pending', 'resolved')),
+  assigned_agent_id uuid references public.support_agents(id) on delete set null,
+  unread_count integer not null default 0,
+  last_message_preview text not null default '',
+  last_message_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.whatsapp_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.whatsapp_conversations(id) on delete cascade,
+  wa_message_id text unique,
+  direction text not null check (direction in ('inbound', 'outbound')),
+  message_type text not null default 'text',
+  body text not null default '',
+  template_name text,
+  status text not null default 'received',
+  raw_payload jsonb not null default '{}'::jsonb,
+  sent_by_admin_id uuid references public.admin_users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.support_notes (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.whatsapp_conversations(id) on delete cascade,
+  admin_user_id uuid references public.admin_users(id) on delete set null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.support_message_templates (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  label text not null,
+  category text not null default 'support',
+  body text not null,
+  whatsapp_template_name text,
+  language_code text not null default 'en_US',
+  enabled boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 alter table public.customers enable row level security;
 alter table public.pending_signups enable row level security;
 alter table public.customer_sessions enable row level security;
@@ -146,6 +204,11 @@ alter table public.catalog_versions enable row level security;
 alter table public.inbox_messages enable row level security;
 alter table public.rate_limits enable row level security;
 alter table public.integration_settings enable row level security;
+alter table public.support_agents enable row level security;
+alter table public.whatsapp_conversations enable row level security;
+alter table public.whatsapp_messages enable row level security;
+alter table public.support_notes enable row level security;
+alter table public.support_message_templates enable row level security;
 
 alter table public.customers
   alter column phone drop not null;
@@ -207,6 +270,14 @@ create index if not exists inbox_messages_created_idx on public.inbox_messages(c
 create index if not exists inbox_messages_read_idx on public.inbox_messages(is_read, created_at desc);
 create index if not exists rate_limits_reset_idx on public.rate_limits(reset_at);
 create index if not exists integration_settings_updated_idx on public.integration_settings(updated_at desc);
+create index if not exists support_agents_active_idx on public.support_agents(is_active, name);
+create index if not exists whatsapp_conversations_last_idx on public.whatsapp_conversations(last_message_at desc);
+create index if not exists whatsapp_conversations_status_idx on public.whatsapp_conversations(status, last_message_at desc);
+create index if not exists whatsapp_conversations_agent_idx on public.whatsapp_conversations(assigned_agent_id, last_message_at desc);
+create index if not exists whatsapp_messages_conversation_idx on public.whatsapp_messages(conversation_id, created_at asc);
+create index if not exists whatsapp_messages_status_idx on public.whatsapp_messages(status, created_at desc);
+create index if not exists support_notes_conversation_idx on public.support_notes(conversation_id, created_at desc);
+create index if not exists support_message_templates_enabled_idx on public.support_message_templates(enabled, category, label);
 
 drop policy if exists "Public can read catalog versions" on public.catalog_versions;
 create policy "Public can read catalog versions"
@@ -218,6 +289,58 @@ create policy "Public can read catalog versions"
 insert into public.catalog_versions (key, reason)
 values ('products', 'initial')
 on conflict (key) do nothing;
+
+insert into public.support_agents (name, email, role)
+values ('Owner', 'owner@ikshagifts.shop', 'owner')
+on conflict (email) do nothing;
+
+insert into public.support_message_templates (
+  key,
+  label,
+  category,
+  body,
+  whatsapp_template_name,
+  language_code
+) values
+  (
+    'order_confirmation',
+    'Order confirmation',
+    'order',
+    'Hi {{name}}, your iksha gifts order {{orderId}} has been received. We will share updates as your gift is prepared.',
+    'order_confirmation',
+    'en_US'
+  ),
+  (
+    'shipping_update',
+    'Shipping update',
+    'shipping',
+    'Hi {{name}}, your iksha gifts order {{orderId}} has been shipped. Tracking: {{trackingNumber}}.',
+    'shipping_update',
+    'en_US'
+  ),
+  (
+    'delivery_notification',
+    'Delivery notification',
+    'delivery',
+    'Hi {{name}}, your iksha gifts order {{orderId}} is out for delivery today.',
+    'delivery_notification',
+    'en_US'
+  ),
+  (
+    'support_reply',
+    'Support reply',
+    'support',
+    'Hi {{name}}, thanks for contacting iksha gifts. Our support team is checking this and will update you shortly.',
+    'support_reply',
+    'en_US'
+  )
+on conflict (key) do update set
+  label = excluded.label,
+  category = excluded.category,
+  body = excluded.body,
+  whatsapp_template_name = excluded.whatsapp_template_name,
+  language_code = excluded.language_code,
+  enabled = true;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

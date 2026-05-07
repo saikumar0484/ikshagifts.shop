@@ -38,13 +38,17 @@ const defaultIntegrations: Record<IntegrationView["key"], Omit<IntegrationView, 
   },
   whatsapp: {
     key: "whatsapp",
-    label: "WhatsApp customer updates",
+    label: "WhatsApp Business support",
     provider: "manual",
     enabled: true,
     status: "manual",
     publicConfig: {
       businessPhone: "",
       defaultCountryCode: "+91",
+      appId: "",
+      wabaId: "",
+      graphVersion: "v23.0",
+      webhookUrl: "https://ikshagifts.shop/api/whatsapp/webhook",
       orderTemplate:
         "Hi {{name}}, your iksha gifts order {{orderId}} is now {{status}}. Thank you for supporting handmade gifts.",
     },
@@ -106,6 +110,10 @@ function normalizePublicConfig(key: IntegrationView["key"], body: Record<string,
   return {
     businessPhone: safeString(body.businessPhone, 30),
     defaultCountryCode: safeString(body.defaultCountryCode || "+91", 8),
+    appId: safeString(body.appId, 80),
+    wabaId: safeString(body.wabaId, 80),
+    graphVersion: safeString(body.graphVersion || "v23.0", 16),
+    webhookUrl: safeString(body.webhookUrl, 240) || "https://ikshagifts.shop/api/whatsapp/webhook",
     orderTemplate: safeString(body.orderTemplate, 500),
   };
 }
@@ -118,6 +126,9 @@ function statusFor(
 ) {
   if (!enabled) return "needs_setup";
   if (key === "whatsapp" && provider === "manual") return "manual";
+  if (key === "whatsapp" && provider === "whatsapp_cloud") {
+    return secrets.apiToken && secrets.senderId ? "ready" : "needs_setup";
+  }
   return Object.values(secrets || {}).some(Boolean) ? "ready" : "needs_setup";
 }
 

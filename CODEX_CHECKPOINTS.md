@@ -1535,7 +1535,7 @@ Live smoke check:
 
 ## Checkpoint 32 - Razorpay Checkout CSP Frame Fix
 
-Status: Local implementation completed, ready for production deployment.
+Status: Production deployed and pushed to GitHub.
 
 Date: 2026-05-07
 
@@ -1570,4 +1570,29 @@ Result:
 
 Deployment:
 
-- Pending in this checkpoint until the production Vercel deploy completes.
+- Production deployment completed:
+
+```text
+https://iksha-gifts-supabase-commerce-3nfl43sci.vercel.app
+```
+
+- Vercel aliased the deployment to:
+
+```text
+https://ikshagifts.shop
+```
+
+GitHub:
+
+```text
+9b504d2 Allow Razorpay checkout frames in CSP
+```
+
+Live smoke check:
+
+- `https://ikshagifts.shop` returned HTTP 200.
+- Live CSP includes:
+  - `connect-src ... https://*.razorpay.com`
+  - `frame-src https://*.razorpay.com`
+  - `form-action ... https://*.razorpay.com`
+- Live Permissions-Policy includes payment permission for Razorpay checkout/API origins.

@@ -955,6 +955,30 @@ https://ikshagifts.shop/api/whatsapp/webhook
 
 - Use the same webhook verify token in Meta and in the admin integration settings.
 
+## Checkpoint 28 - Remove Manual WhatsApp Web Panel
+
+Status: Local admin UI cleanup completed.
+
+Date: 2026-05-07
+
+Goal:
+
+- Remove the confusing WhatsApp Web QR/manual tab flow from Integrations.
+- Make support happen inside the admin dashboard through the official WhatsApp Business Platform module.
+
+What changed:
+
+- Updated `src/admin/AdminDashboard.tsx`.
+- Removed the manual "Customer chat manager" section that opened WhatsApp Web in a new tab.
+- Replaced it with a direct card that opens the in-dashboard Support inbox.
+- Kept Meta/WhatsApp Manager external links only for one-time official account setup, not daily customer support.
+- Updated `README.md` to clarify that WhatsApp Web is not embedded or automated.
+
+Reason:
+
+- WhatsApp Web cannot be safely embedded in the dashboard and unofficial automation creates account/legal risk.
+- The correct customer-support workflow is the Support tab backed by official Cloud API webhooks and messages.
+
 Important note:
 
 - This is a cloud preview/public Vercel alias, not the main `https://ikshagifts.shop` production website.

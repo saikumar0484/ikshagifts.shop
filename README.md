@@ -52,10 +52,6 @@ What is working:
 - Admin dashboard on `admin.ikshagifts.shop`
 - Admin inbox with read/unread and delete actions
 - Admin product workflows for adding, editing, deleting, and filtering by category
-- Admin WhatsApp integration now supports a safe WhatsApp Web workflow:
-  - open official WhatsApp Web QR login from the dashboard
-  - search customer phone contacts from the customer database
-  - open prefilled WhatsApp chat links for customer support and order updates
 - Admin Support tab now includes a policy-compliant WhatsApp Business Platform CRM module:
   - webhook endpoint at `/api/whatsapp/webhook`
   - official Cloud API send path using phone number ID and access token
@@ -69,7 +65,7 @@ What is working:
 What is not fully finished yet:
 
 - Automated phone or WhatsApp OTP still depends on a real provider being configured
-- WhatsApp Web login is intentionally opened through the official WhatsApp Web tab. The dashboard does not store or automate the WhatsApp session.
+- WhatsApp Web is not embedded or used for support automation. The admin dashboard uses the official WhatsApp Business Platform webhook/API pattern instead.
 - WhatsApp Business Platform requires Meta credentials in Integrations before real sending/receiving works:
   - `Cloud API access token`
   - `Phone number ID`

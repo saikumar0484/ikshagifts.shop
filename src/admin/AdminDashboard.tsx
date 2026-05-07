@@ -316,7 +316,6 @@ export function AdminDashboard() {
   const [productSearch, setProductSearch] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
-  const [contactSearch, setContactSearch] = useState("");
   const [statusDraft, setStatusDraft] = useState<Record<string, string>>({});
   const [trackingDraft, setTrackingDraft] = useState<Record<string, string>>({});
   const [deliveryDraft, setDeliveryDraft] = useState<Record<string, string>>({});
@@ -367,21 +366,6 @@ export function AdminDashboard() {
       ),
     );
   };
-
-  const whatsappContacts = useMemo(() => {
-    const query = contactSearch.trim().toLowerCase();
-    return customers
-      .filter((customer) => {
-        if (!phoneDigits(customer.phone)) return false;
-        if (!query) return true;
-        return [customer.name, customer.email, customer.phone].some((value) =>
-          String(value || "")
-            .toLowerCase()
-            .includes(query),
-        );
-      })
-      .sort((a, b) => (b.lastOrderAt || "").localeCompare(a.lastOrderAt || ""));
-  }, [contactSearch, customers]);
 
   const filteredSupportConversations = useMemo(() => {
     const query = supportSearch.trim().toLowerCase();
@@ -2454,86 +2438,27 @@ export function AdminDashboard() {
               );
             })}
             <article className="rounded-2xl border border-border bg-card p-6 xl:col-span-2">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-primary">
-                    WhatsApp contacts
+                    WhatsApp support inbox
                   </p>
-                  <h2 className="font-display text-2xl">Customer chat manager</h2>
-                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    Use this after logging into WhatsApp Web. Each contact opens a prefilled
-                    customer chat in the official WhatsApp session.
+                  <h2 className="font-display text-2xl">Manage chats inside this dashboard</h2>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                    Once the official Cloud API webhook is connected, customer messages appear in
+                    the Support tab with conversation history, customer profile, order details,
+                    assignments, notes, templates, and reply suggestions.
                   </p>
                 </div>
-                <a
-                  href="https://web.whatsapp.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-4 py-2 text-sm font-semibold text-white"
+                <button
+                  type="button"
+                  onClick={() => setTab("support")}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
                 >
-                  <ExternalLink size={16} />
-                  Open WhatsApp Web
-                </a>
+                  <MessageCircle size={16} />
+                  Open Support Inbox
+                </button>
               </div>
-
-              <label className="mt-5 flex items-center gap-2 rounded-full border border-input bg-background px-4 py-2 text-sm">
-                <Search size={16} className="text-primary" />
-                <input
-                  value={contactSearch}
-                  onChange={(event) => setContactSearch(event.target.value)}
-                  placeholder="Search customers by name, email, or phone"
-                  className="min-w-0 flex-1 bg-transparent outline-none"
-                />
-              </label>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {whatsappContacts.slice(0, 12).map((customer) => (
-                  <div
-                    key={customer.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4"
-                  >
-                    <div>
-                      <h3 className="font-display text-lg">{customer.name}</h3>
-                      <p className="text-sm text-muted-foreground">{formatPhone(customer.phone)}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {customer.orderCount || 0} orders -{" "}
-                        {formatPrice(customer.lifetimeValue || 0)}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={whatsappLink(
-                          customer.phone,
-                          `Hi ${customer.name}, this is iksha gifts. How can we help you today?`,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-3 py-2 text-xs font-semibold text-white"
-                      >
-                        <MessageCircle size={14} />
-                        Chat
-                      </a>
-                      <a
-                        href={whatsappLink(
-                          customer.phone,
-                          `Hi ${customer.name}, thank you for shopping with iksha gifts. We are checking your order update now.`,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-primary"
-                      >
-                        Order update
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {!whatsappContacts.length ? (
-                <div className="mt-5 rounded-2xl border border-dashed border-border bg-background p-6 text-sm text-muted-foreground">
-                  No customer phone contacts match this search yet.
-                </div>
-              ) : null}
             </article>
           </section>
         )}

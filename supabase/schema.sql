@@ -63,11 +63,20 @@ create table if not exists public.orders (
   id text primary key,
   user_id uuid not null references public.customers(id) on delete cascade,
   amount integer not null,
+  subtotal_amount integer,
+  discount_amount integer not null default 0,
+  coupon_code text,
   currency text not null default 'INR',
   items jsonb not null default '[]'::jsonb,
   status text not null default 'order_placed',
   payment_status text not null default 'pending',
+  payment_method text not null default 'cod',
+  customer_name text,
+  customer_phone text,
+  shipping_address text,
+  pin_code text,
   payment_id text,
+  razorpay_order_id text,
   tracking_number text,
   estimated_delivery date,
   status_history jsonb not null default '[]'::jsonb,
@@ -136,18 +145,30 @@ alter table public.customers
 alter table public.pending_signups
   alter column phone drop not null;
 
+alter table public.orders
+  add column if not exists subtotal_amount integer,
+  add column if not exists discount_amount integer not null default 0,
+  add column if not exists coupon_code text,
+  add column if not exists payment_method text not null default 'cod',
+  add column if not exists customer_name text,
+  add column if not exists customer_phone text,
+  add column if not exists shipping_address text,
+  add column if not exists pin_code text,
+  add column if not exists razorpay_order_id text;
+
 update public.products
 set category = case
+  when lower(category) = 'women' then 'women'
   when lower(category) = 'men' then 'men'
   else 'customized_gifts'
 end
-where category not in ('men', 'customized_gifts');
+where category not in ('women', 'men', 'customized_gifts');
 
 alter table public.products
   drop constraint if exists products_category_check;
 
 alter table public.products
-  add constraint products_category_check check (category in ('men', 'customized_gifts'));
+  add constraint products_category_check check (category in ('women', 'men', 'customized_gifts'));
 
 create index if not exists orders_user_created_idx on public.orders(user_id, created_at desc);
 create index if not exists pending_signups_expires_idx on public.pending_signups(expires_at);
@@ -176,13 +197,34 @@ insert into public.products (
   is_featured,
   sort_order
 ) values
-  ('forever-bouquet', 'Forever Bouquet', 'customized_gifts', 'Bestseller', 'Hand-crocheted blooms wrapped with ribbon, made to stay bright forever.', null, 1200, 1450, 4.9, 'Ships in 4-6 days', 8, true, true, 10),
-  ('sweet-pea-bow', 'Sweet Pea Bow', 'customized_gifts', 'New', 'Soft pastel crochet bow for bags, clips, gifts, and everyday cozy looks.', null, 250, 320, 4.8, 'Ships in 2-3 days', 20, true, true, 20),
-  ('pocket-pals', 'Pocket Pals', 'men', 'Cute', 'Tiny crochet bears, bunnies, and charms to clip onto bags and keys.', null, 350, null, 4.7, 'Ships in 3-5 days', 15, true, true, 30),
-  ('blue-lily', 'Blue Lily Stem', 'men', 'Studio Pick', 'A bright blue crochet flower stem for shelves, desks, and gift bundles.', null, 420, null, 4.8, 'Ships in 5-7 days', 6, true, false, 40),
-  ('bunny-charm', 'Bunny Charm', 'customized_gifts', 'Loved', 'A tiny bunny friend with soft details and a handmade ribbon finish.', null, 520, 650, 4.9, 'Ships in 5-7 days', 6, true, false, 50),
-  ('sunny-stem', 'Sunny Stem', 'customized_gifts', 'Giftable', 'A sunflower crochet stem that brings a little warmth to any corner.', null, 480, null, 4.8, 'Ships in 4-6 days', 10, true, false, 60)
-on conflict (id) do nothing;
+  ('bracelet', 'Stylish Bracelet', 'women', 'New', 'A trendy bracelet designed to elevate your everyday look with elegance and charm.', 'https://via.placeholder.com/300?text=Bracelet', 5000, 6000, 4.8, '', 25, true, true, 10),
+  ('couple-watches', 'Premium Couple Watches', 'customized_gifts', 'Couple', 'A perfect matching watch set for couples, symbolizing love and timeless bonding.', 'https://via.placeholder.com/300?text=Couple+Watches', 5000, 6000, 4.8, '', 25, true, true, 20),
+  ('couple-bracelets', 'Couple Bracelets Set', 'customized_gifts', 'Couple', 'Beautiful matching bracelets crafted for couples to celebrate their connection.', 'https://via.placeholder.com/300?text=Couple+Bracelets', 5000, 6000, 4.8, '', 25, true, true, 30),
+  ('women-watch', 'Elegant Women Watch', 'women', 'Elegant', 'A stylish and modern watch designed for women who love sophistication.', 'https://via.placeholder.com/300?text=Women+Watch', 5000, 6000, 4.8, '', 25, true, true, 40),
+  ('men-watch', 'Classic Men Watch', 'men', 'Classic', 'A bold and classy watch built for men who appreciate timeless fashion.', 'https://via.placeholder.com/300?text=Men+Watch', 5000, 6000, 4.8, '', 25, true, true, 50),
+  ('small-bouquet', 'Small Flower Bouquet', 'customized_gifts', 'Bouquet', 'A cute bouquet arrangement perfect for small surprises and sweet moments.', 'https://via.placeholder.com/300?text=Small+Bouquet', 5000, 6000, 4.8, '', 25, true, false, 60),
+  ('large-bouquet', 'Grand Flower Bouquet', 'customized_gifts', 'Bouquet', 'A luxurious bouquet designed to make every occasion extra special.', 'https://via.placeholder.com/300?text=Large+Bouquet', 5000, 6000, 4.8, '', 25, true, false, 70),
+  ('small-hamper', 'Small Gift Hamper', 'customized_gifts', 'Hamper', 'A compact hamper filled with delightful surprises for your loved ones.', 'https://via.placeholder.com/300?text=Small+Hamper', 5000, 6000, 4.8, '', 25, true, false, 80),
+  ('large-hamper', 'Luxury Gift Hamper', 'customized_gifts', 'Hamper', 'A premium hamper packed with exclusive gifts to impress and delight.', 'https://via.placeholder.com/300?text=Large+Hamper', 5000, 6000, 4.8, '', 25, true, false, 90),
+  ('magazine-gift', 'Customized Magazine Gift', 'customized_gifts', 'Custom', 'A unique magazine-style gift designed to capture memories creatively.', 'https://via.placeholder.com/300?text=Magazine+Gift', 5000, 6000, 4.8, '', 25, true, false, 100),
+  ('women-couple-bracelet', 'Women Couple Bracelet', 'women', 'Couple', 'A stylish bracelet specially crafted for women in a couple set.', 'https://via.placeholder.com/300?text=Women+Bracelet', 5000, 6000, 4.8, '', 25, true, false, 110),
+  ('men-couple-bracelet', 'Men Couple Bracelet', 'men', 'Couple', 'A bold and elegant bracelet designed for men in a couple set.', 'https://via.placeholder.com/300?text=Men+Bracelet', 5000, 6000, 4.8, '', 25, true, false, 120),
+  ('women-couple-watches', 'Women Couple Watches', 'women', 'Couple', 'A beautifully designed watch set perfect for couples who love matching styles.', 'https://via.placeholder.com/300?text=Women+Couple+Watches', 5000, 6000, 4.8, '', 25, true, false, 130)
+on conflict (id) do update set
+  name = excluded.name,
+  category = excluded.category,
+  tag = excluded.tag,
+  description = excluded.description,
+  image_url = excluded.image_url,
+  price = excluded.price,
+  old_price = excluded.old_price,
+  rating = excluded.rating,
+  delivery = excluded.delivery,
+  stock_quantity = excluded.stock_quantity,
+  is_available = excluded.is_available,
+  is_featured = excluded.is_featured,
+  sort_order = excluded.sort_order,
+  updated_at = now();
 
 grant usage on schema public to service_role;
 grant select, insert, update, delete on all tables in schema public to service_role;

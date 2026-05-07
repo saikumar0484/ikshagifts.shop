@@ -8,16 +8,22 @@ import { ProductCollection } from "@/data/products";
 
 export const collectionNav = [
   {
+    slug: "women" as ProductCollection,
+    href: "/collections/women",
+    label: "Women",
+    blurb: "Bracelets, watches, and elegant gift picks for women.",
+  },
+  {
     slug: "men" as ProductCollection,
     href: "/collections/men",
     label: "Men",
-    blurb: "Premium, clean gift picks for birthdays, milestones, and work celebrations.",
+    blurb: "Watches, bracelets, and classic gift picks for men.",
   },
   {
     slug: "custom" as ProductCollection,
     href: "/collections/custom",
     label: "Customized Gifts",
-    blurb: "Personalize colors, names, wrapping, and the final unboxing experience.",
+    blurb: "Bouquets, hampers, couple sets, and personalized gifts.",
   },
 ];
 
@@ -70,5 +76,11 @@ export const giftExperience = [
     description:
       "The final reveal is polished, camera-ready, and designed to feel memorable before the gift is even opened.",
     image: galleryThree,
+  },
+  {
+    title: "Personal Touch",
+    description:
+      "Message cards, colors, and finishing details are matched to the person and the occasion.",
+    image: bouquet,
   },
 ];

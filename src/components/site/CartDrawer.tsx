@@ -1,8 +1,23 @@
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { formatPrice } from "@/data/products";
-import { useCommerce } from "@/lib/commerce";
+import { CheckoutDetails, useCommerce } from "@/lib/commerce";
+
+const validCouponCode = "IKSHA150";
+const couponDiscountAmount = 150;
 
 export function CartDrawer() {
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState("");
+  const [couponMessage, setCouponMessage] = useState("");
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [details, setDetails] = useState<CheckoutDetails>({
+    name: "",
+    mobile: "",
+    address: "",
+    pinCode: "",
+    paymentMethod: "online",
+  });
   const {
     cart,
     cartOpen,
@@ -14,6 +29,49 @@ export function CartDrawer() {
     placeOrder,
     getProduct,
   } = useCommerce();
+
+  const cartDiscount = useMemo(() => {
+    if (appliedCoupon !== validCouponCode || cartTotal <= 0) return 0;
+    return Math.min(couponDiscountAmount, cartTotal);
+  }, [appliedCoupon, cartTotal]);
+
+  const finalTotal = Math.max(0, cartTotal - cartDiscount);
+
+  useEffect(() => {
+    if (!cart.length) {
+      setCouponInput("");
+      setAppliedCoupon("");
+      setCouponMessage("");
+      setShowCheckoutForm(false);
+    }
+  }, [cart.length]);
+
+  const updateDetails = (field: keyof CheckoutDetails, value: string) => {
+    setDetails((current) => ({ ...current, [field]: value }));
+  };
+
+  const applyCoupon = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = couponInput.trim().toUpperCase();
+    if (!normalized) {
+      setCouponMessage("Enter a coupon code.");
+      setAppliedCoupon("");
+      return;
+    }
+    if (normalized !== validCouponCode) {
+      setCouponMessage("Invalid coupon code.");
+      setAppliedCoupon("");
+      return;
+    }
+    setAppliedCoupon(normalized);
+    setCouponInput(normalized);
+    setCouponMessage(`Coupon applied. You saved ${formatPrice(couponDiscountAmount)}.`);
+  };
+
+  const submitOrder = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    placeOrder(appliedCoupon, details);
+  };
 
   return (
     <div
@@ -139,20 +197,133 @@ export function CartDrawer() {
             <span className="text-sm text-muted-foreground">Subtotal</span>
             <span className="font-display text-2xl text-foreground">{formatPrice(cartTotal)}</span>
           </div>
+          {cart.length > 0 && (
+            <form onSubmit={applyCoupon} className="mt-4 rounded-2xl bg-background p-3">
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                Coupon code
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(event) => setCouponInput(event.target.value)}
+                  placeholder="Enter coupon"
+                  className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2 text-sm outline-none focus:border-primary"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background"
+                >
+                  Apply
+                </button>
+              </div>
+              {couponMessage && (
+                <p
+                  className={`mt-2 text-xs ${appliedCoupon ? "text-primary" : "text-destructive"}`}
+                >
+                  {couponMessage}
+                </p>
+              )}
+            </form>
+          )}
+          {cartDiscount > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Discount ({appliedCoupon})</span>
+              <span className="font-display text-xl text-primary">
+                -{formatPrice(cartDiscount)}
+              </span>
+            </div>
+          )}
+          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <span className="text-sm font-semibold text-foreground">Total bill</span>
+            <span className="font-display text-3xl text-foreground">{formatPrice(finalTotal)}</span>
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">
             Shipping and customisation notes are confirmed after checkout.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Online payment is paused until Razorpay verification is complete.
+            UPI and card payments open securely through Razorpay.
           </p>
-          <button
-            type="button"
-            disabled={!cart.length || checkout.status === "loading"}
-            onClick={placeOrder}
-            className="mt-5 w-full rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
-          >
-            {checkout.status === "loading" ? "Creating order..." : "Place order request"}
-          </button>
+          {showCheckoutForm && cart.length > 0 && (
+            <form onSubmit={submitOrder} className="mt-5 grid gap-3 rounded-2xl bg-background p-4">
+              <label className="text-sm font-medium text-foreground">
+                Name
+                <input
+                  value={details.name}
+                  onChange={(event) => updateDetails("name", event.target.value)}
+                  required
+                  className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="text-sm font-medium text-foreground">
+                Mobile Number
+                <input
+                  value={details.mobile}
+                  onChange={(event) => updateDetails("mobile", event.target.value)}
+                  required
+                  inputMode="tel"
+                  pattern="[0-9+\\-\\s]{10,16}"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="text-sm font-medium text-foreground">
+                Address
+                <textarea
+                  value={details.address}
+                  onChange={(event) => updateDetails("address", event.target.value)}
+                  required
+                  minLength={8}
+                  className="mt-1.5 min-h-20 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm font-medium text-foreground">
+                  Pin Code
+                  <input
+                    value={details.pinCode}
+                    onChange={(event) => updateDetails("pinCode", event.target.value)}
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm outline-none focus:border-primary"
+                  />
+                </label>
+                <label className="text-sm font-medium text-foreground">
+                  Payment
+                  <select
+                    value={details.paymentMethod}
+                    onChange={(event) =>
+                      updateDetails(
+                        "paymentMethod",
+                        event.target.value as CheckoutDetails["paymentMethod"],
+                      )
+                    }
+                    className="mt-1.5 w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="online">Pay With UPI / Cards</option>
+                    <option value="upi">UPI after confirmation</option>
+                    <option value="cod">Cash on delivery</option>
+                  </select>
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={checkout.status === "loading"}
+                className="mt-2 w-full rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
+              >
+                {checkout.status === "loading" ? "Placing order..." : "Place Your Order"}
+              </button>
+            </form>
+          )}
+          {!showCheckoutForm && (
+            <button
+              type="button"
+              disabled={!cart.length || checkout.status === "loading"}
+              onClick={() => setShowCheckoutForm(true)}
+              className="mt-5 w-full rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
+            >
+              Place Your Order
+            </button>
+          )}
         </div>
       </aside>
     </div>

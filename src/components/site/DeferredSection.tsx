@@ -34,7 +34,11 @@ export function DeferredSection({
 
   return (
     <div ref={ref} id={id} className={className} style={{ minHeight }}>
-      {ready ? children : <div className="h-full min-h-full animate-pulse rounded-[2rem] bg-secondary/45" />}
+      {ready ? (
+        children
+      ) : (
+        <div className="h-full min-h-full animate-pulse rounded-[2rem] bg-secondary/45" />
+      )}
     </div>
   );
 }

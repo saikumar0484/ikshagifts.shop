@@ -30,33 +30,33 @@ export function LegalPolicies() {
   return (
     <section
       id="legal"
-      className="border-y border-border bg-secondary/35 px-6 py-20 md:px-10"
+      className="border-y border-border bg-secondary/35 px-6 py-10 md:px-10"
       aria-labelledby="legal-heading"
     >
       <div className="mx-auto max-w-7xl">
-        <div className="mb-10 max-w-3xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+        <div className="mb-6 max-w-3xl">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
             customer care
           </p>
-          <h2 id="legal-heading" className="font-display text-3xl text-foreground md:text-4xl">
+          <h2 id="legal-heading" className="font-display text-xl text-foreground md:text-2xl">
             Clear policies for safer shopping
           </h2>
-          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             These policies protect customers and the original work on this store. For final legal
             readiness, have the wording reviewed by a qualified professional for your location and
             business model.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {policies.map((policy) => (
             <article
               id={policy.id}
               key={policy.id}
-              className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+              className="rounded-xl border border-border bg-card p-4 shadow-sm"
             >
-              <h3 className="font-display text-xl text-foreground">{policy.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">{policy.text}</p>
+              <h3 className="font-display text-base text-foreground">{policy.title}</h3>
+              <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{policy.text}</p>
             </article>
           ))}
         </div>

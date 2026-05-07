@@ -7,6 +7,10 @@
     {
       "source": "/admin/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/cart/add/:path*",
+      "destination": "/index.html"
     }
   ],
   "headers": [

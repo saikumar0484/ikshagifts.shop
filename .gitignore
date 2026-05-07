@@ -39,3 +39,5 @@ qa-results.json
 *.sw?
 
 .vercel
+
+.vercel

@@ -70,6 +70,50 @@ export type CustomerOrder = {
   created_at: string;
 };
 
+export type CheckoutDetails = {
+  name: string;
+  mobile: string;
+  address: string;
+  pinCode: string;
+  paymentMethod: "online" | "upi" | "cod";
+};
+
+type RazorpaySuccess = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: "INR";
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    contact: string;
+  };
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpaySuccess) => void;
+  modal: {
+    ondismiss: () => void;
+  };
+};
+
+type RazorpayConstructor = new (options: RazorpayOptions) => {
+  open: () => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: RazorpayConstructor;
+  }
+}
+
 type CommerceContextValue = {
   user: User | null;
   cart: CartLine[];
@@ -94,7 +138,7 @@ type CommerceContextValue = {
   requestSignupOtp: (payload: EmailSignupPayload) => Promise<void>;
   verifySignupOtp: (payload: { otp: string }) => Promise<void>;
   logout: () => Promise<void>;
-  placeOrder: () => Promise<void>;
+  placeOrder: (couponCode?: string, details?: CheckoutDetails) => Promise<void>;
   loadOrders: () => Promise<void>;
   getProduct: (productId: string) => Product | undefined;
 };
@@ -134,6 +178,29 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+function loadRazorpayCheckout() {
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Razorpay could not load.")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Razorpay could not load."));
+    document.body.appendChild(script);
+  });
+}
+
 export function CommerceProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -161,6 +228,8 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
           Product & {
             imageUrl?: string;
             image_url?: string;
+            cartUrl?: string;
+            cart_url?: string;
             categorySlug?: string;
             desc?: string;
             description?: string;
@@ -189,6 +258,11 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
                 desc: product.desc || product.description || fallback?.desc || "",
                 image:
                   product.imageUrl || product.image_url || fallback?.image || products[0].image,
+                cartUrl:
+                  product.cartUrl ||
+                  product.cart_url ||
+                  fallback?.cartUrl ||
+                  `/cart/add/${product.id}`,
                 oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,
                 rating: product.rating ?? fallback?.rating ?? 4.8,
                 delivery: product.delivery || fallback?.delivery || "Ships in 4-6 days",
@@ -239,7 +313,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
     [cart, getProduct],
   );
 
-  const addToCart = (productId: string) => {
+  const addToCart = useCallback((productId: string) => {
     setCart((current) => {
       const existing = current.find((line) => line.productId === productId);
       if (existing) {
@@ -250,7 +324,16 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       return [...current, { productId, quantity: 1 }];
     });
     setCartOpen(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/cart\/add\/([^/]+)\/?$/);
+    if (!match) return;
+    const productId = decodeURIComponent(match[1]);
+    if (!managedProducts.some((product) => product.id === productId)) return;
+    addToCart(productId);
+    window.history.replaceState(null, "", "/#featured-products");
+  }, [addToCart, managedProducts]);
 
   const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
@@ -275,7 +358,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
 
   const closeAuth = () => setAuthOpen(false);
 
-  const login = async (payload: PhoneLoginPayload) => {
+  const login = async (payload: EmailLoginPayload) => {
     const data = await api<{ user?: User; otpRequested?: boolean }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -288,7 +371,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
     return { otpRequested: data.otpRequested };
   };
 
-  const requestSignupOtp = async (payload: PhoneSignupPayload) => {
+  const requestSignupOtp = async (payload: EmailSignupPayload) => {
     const data = await api<{ pendingId: string }>("/api/auth/request-otp", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -318,25 +401,92 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
     setOrders(data.orders);
   };
 
-  const placeOrder = async () => {
+  const placeOrder = async (couponCode = "", details?: CheckoutDetails) => {
     if (!cart.length) return;
-    if (!user) {
-      openAuth("login");
-      return;
-    }
-    setCheckout({ status: "loading", message: "Creating your order request..." });
+    setCheckout({
+      status: "loading",
+      message:
+        details?.paymentMethod === "online"
+          ? "Opening secure Razorpay payment..."
+          : "Creating your order...",
+    });
     try {
+      if (details?.paymentMethod === "online") {
+        const paymentOrder = await api<{
+          keyId: string;
+          appOrderId: string;
+          razorpayOrderId: string;
+          amount: number;
+          currency: "INR";
+          customer: {
+            name: string;
+            contact: string;
+          };
+        }>("/api/payments/verify?action=create-order", {
+          method: "POST",
+          body: JSON.stringify({ items: cart, couponCode, customerDetails: details }),
+        });
+
+        await loadRazorpayCheckout();
+        if (!window.Razorpay) throw new Error("Razorpay could not load.");
+
+        await new Promise<void>((resolve, reject) => {
+          const checkout = new window.Razorpay!({
+            key: paymentOrder.keyId,
+            amount: paymentOrder.amount,
+            currency: paymentOrder.currency,
+            name: "iksha gifts",
+            description: "Gift order payment",
+            order_id: paymentOrder.razorpayOrderId,
+            prefill: paymentOrder.customer,
+            theme: {
+              color: "#8c5b43",
+            },
+            handler: async (response) => {
+              try {
+                await api("/api/payments/verify", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    appOrderId: paymentOrder.appOrderId,
+                    razorpayOrderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                  }),
+                });
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            },
+            modal: {
+              ondismiss: () => reject(new Error("Payment was not completed.")),
+            },
+          });
+          checkout.open();
+        });
+
+        clearCart();
+        if (user) await loadOrders();
+        setCartOpen(false);
+        if (user) setOrdersOpen(true);
+        setCheckout({
+          status: "success",
+          message: "Order Has Been Placed. Congratulations!",
+        });
+        return;
+      }
+
       await api<{ order: CustomerOrder }>("/api/orders", {
         method: "POST",
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ items: cart, couponCode, customerDetails: details }),
       });
       clearCart();
-      await loadOrders();
+      if (user) await loadOrders();
       setCartOpen(false);
-      setOrdersOpen(true);
+      if (user) setOrdersOpen(true);
       setCheckout({
         status: "success",
-        message: "Order request created. Track it from My Orders.",
+        message: "Order Has Been Placed. Congratulations!",
       });
     } catch (error) {
       setCheckout({

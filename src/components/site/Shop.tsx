@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingBag, Sparkles } from "lucide-react";
 import {
   categoryLabel,
+  categoryToCollection,
   collectionDescriptions,
   collectionLabels,
   collectionToCategory,
@@ -21,8 +22,15 @@ type ProductSectionProps = {
   products: Product[];
 };
 
+const collectionPills: Array<{ slug: ProductCollection; href: string; label: string }> = [
+  { slug: "men", href: "/collections/men", label: "Gift For Men" },
+  { slug: "women", href: "/collections/women", label: "Gift For Women" },
+  { slug: "custom", href: "/collections/custom", label: "Customized Gifts" },
+];
+
 function ProductCard({ product }: { product: Product }) {
   const { addToCart, setCartOpen } = useCommerce();
+  const [showDescription, setShowDescription] = useState(false);
 
   const buyNow = () => {
     addToCart(product.id);
@@ -30,58 +38,71 @@ function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.55rem] border border-border bg-card shadow-card transition-all hover:-translate-y-1 hover:shadow-soft">
-      <div className="bg-secondary/55 p-4">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-[1.25rem]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[0.75rem] border border-border bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft">
+      <button
+        type="button"
+        onClick={() => setShowDescription((current) => !current)}
+        className="block bg-secondary/55 p-2 text-left"
+        aria-expanded={showDescription}
+      >
+        <div className="relative aspect-square overflow-hidden rounded-[0.6rem]">
           <SiteImage
             src={product.image}
             alt={product.name}
             loading="lazy"
-            width={900}
-            height={1100}
+            width={300}
+            height={300}
             containerClassName="h-full"
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
-          <span className="absolute left-3 top-3 rounded-full bg-card/92 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary backdrop-blur">
+          <span className="absolute left-2 top-2 rounded-full bg-card/92 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary backdrop-blur">
             {product.tag}
           </span>
         </div>
-      </div>
-      <div className="flex flex-1 flex-col px-4 pb-4">
-        <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+      </button>
+      <div className="flex flex-1 flex-col px-2.5 pb-2.5">
+        <div className="mb-1 text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
           {product.category}
         </div>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-display text-xl leading-tight text-foreground md:text-2xl">
+        <button
+          type="button"
+          onClick={() => setShowDescription((current) => !current)}
+          className="text-left"
+          aria-expanded={showDescription}
+        >
+          <h3 className="font-display text-sm leading-tight text-foreground md:text-base">
             {product.name}
           </h3>
-          <div className="text-right">
-            <span className="font-display text-lg text-primary">{formatPrice(product.price)}</span>
-            {product.oldPrice && (
-              <div className="text-xs text-muted-foreground line-through">
-                {formatPrice(product.oldPrice)}
-              </div>
-            )}
-          </div>
+        </button>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5">
+          <span className="font-display text-sm text-primary md:text-base">
+            {formatPrice(product.price)}
+          </span>
+          {product.oldPrice && (
+            <span className="text-xs text-muted-foreground line-through">
+              {formatPrice(product.oldPrice)}
+            </span>
+          )}
         </div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.desc}</p>
-        <div className="mt-4 space-y-2 text-xs font-medium text-foreground/85">
-          <p>🚚 Delivery in 3–5 Days</p>
-          <p>🎁 Premium Packaging Included</p>
-        </div>
-        <div className="mt-auto grid gap-2 pt-5 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => addToCart(product.id)}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01]"
+        {showDescription && (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{product.desc}</p>
+        )}
+        <div className="mt-auto grid gap-1.5 pt-3 xl:grid-cols-2">
+          <a
+            href={product.cartUrl}
+            onClick={(event) => {
+              event.preventDefault();
+              addToCart(product.id);
+            }}
+            className="inline-flex items-center justify-center gap-1 rounded-full bg-primary px-2 py-1.5 text-[10px] font-semibold text-primary-foreground transition-transform hover:scale-[1.01] md:text-xs"
           >
-            <ShoppingBag size={16} />
+            <ShoppingBag size={12} />
             Add to Cart
-          </button>
+          </a>
           <button
             type="button"
             onClick={buyNow}
-            className="rounded-full border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+            className="rounded-full border border-border bg-background px-2 py-1.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-secondary md:text-xs"
           >
             Buy Now
           </button>
@@ -96,7 +117,7 @@ function ProductSection({ id, products }: ProductSectionProps) {
 
   return (
     <section id={id}>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 md:gap-3">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
@@ -126,32 +147,36 @@ export function Shop({ collectionSlug = null }: ShopProps) {
       .then((data: { products?: Product[] }) => {
         if (!Array.isArray(data.products)) return;
         setCollectionProductsFromDb(
-          data.products.map((product) => ({
-            ...product,
-            category: categoryLabel(product.categorySlug || product.category),
-            collection: collectionSlug,
-          })),
+          data.products.map((product) => {
+            const fallback = products.find((item) => item.id === product.id);
+            const dbCategory = product.categorySlug || product.category;
+            return {
+              ...product,
+              category: categoryLabel(dbCategory),
+              categorySlug: category,
+              collection: categoryToCollection[category],
+              tag: product.tag || fallback?.tag || "New",
+              desc: product.desc || fallback?.desc || "",
+              image: product.imageUrl || product.image || fallback?.image || products[0].image,
+              cartUrl: product.cartUrl || fallback?.cartUrl || `/cart/add/${product.id}`,
+              oldPrice: product.oldPrice ?? fallback?.oldPrice,
+              rating: product.rating ?? fallback?.rating ?? 4.8,
+              delivery: product.delivery || fallback?.delivery || "",
+            };
+          }),
         );
       })
       .catch(() => undefined);
 
     return () => controller.abort();
-  }, [collectionSlug]);
+  }, [collectionSlug, products]);
 
   const availableProducts = useMemo(
     () => products.filter((product) => product.isAvailable !== false),
     [products],
   );
 
-  const featuredProducts = useMemo(
-    () => availableProducts.filter((product) => product.isFeatured).slice(0, 4),
-    [availableProducts],
-  );
-
-  const bestSellingProducts = useMemo(
-    () => availableProducts.filter((product) => product.isBestSeller).slice(0, 4),
-    [availableProducts],
-  );
+  const bestSellingProducts = useMemo(() => availableProducts, [availableProducts]);
 
   const collectionProducts = useMemo(() => {
     const term = query.toLowerCase();
@@ -168,10 +193,25 @@ export function Shop({ collectionSlug = null }: ShopProps) {
       <section className="py-16 md:py-24">
         <div className="mx-auto max-w-7xl px-6 md:px-10">
           <div className="rounded-[2rem] border border-border bg-card p-6 shadow-card md:p-8">
-            <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              <Sparkles size={14} />
-              {collectionLabels[collectionSlug]}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {collectionPills.map((item) => {
+                const isActive = item.slug === collectionSlug;
+                return (
+                  <a
+                    key={item.slug}
+                    href={item.href}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                      isActive
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-background text-primary hover:border-primary hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    {isActive && <Sparkles size={13} />}
+                    {item.label}
+                  </a>
+                );
+              })}
+            </div>
             <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h2 className="font-display text-4xl text-foreground md:text-5xl">
@@ -193,7 +233,7 @@ export function Shop({ collectionSlug = null }: ShopProps) {
             </div>
           </div>
 
-          <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-10 grid grid-cols-3 gap-2 md:gap-3">
             {collectionProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -206,15 +246,7 @@ export function Shop({ collectionSlug = null }: ShopProps) {
   return (
     <section className="py-12 md:py-16">
       <div className="mx-auto flex max-w-7xl flex-col gap-12 px-6 md:px-10">
-        <ProductSection
-          id="featured-products"
-          products={featuredProducts}
-        />
-
-        <ProductSection
-          id="best-selling-products"
-          products={bestSellingProducts}
-        />
+        <ProductSection id="best-selling-products" products={bestSellingProducts} />
       </div>
     </section>
   );

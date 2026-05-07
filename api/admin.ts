@@ -82,7 +82,7 @@ function productBody(body: any) {
   const id = safeString(body.id || slugify(name), 100);
   const category = safeString(body.category || "", 80);
   if (!isProductCategory(category)) {
-    throw new Error("Choose Men or Customized Gifts for the product category.");
+    throw new Error("Choose Women, Men, or Customized Gifts for the product category.");
   }
   return {
     id,

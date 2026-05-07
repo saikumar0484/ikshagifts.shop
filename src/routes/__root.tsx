@@ -29,37 +29,25 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
+      { title: "iksha gifts - Handmade Crochet Bows, Bouquets & Keepsakes" },
       {
         name: "description",
         content:
-          "Picture Perfect Site generates a website from your uploaded images, creating a unique online presence.",
+          "iksha gifts makes handmade crochet bows, bouquets, keychains, and personalized keepsakes for premium gifting in India.",
       },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
+      { name: "author", content: "iksha gifts" },
+      { property: "og:title", content: "iksha gifts - Handmade Crochet Keepsakes" },
       {
         property: "og:description",
         content:
-          "Picture Perfect Site generates a website from your uploaded images, creating a unique online presence.",
+          "Premium handmade crochet gifts, customized with colors, wrapping, and thoughtful finishing.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "iksha gifts - Handmade Crochet Keepsakes" },
       {
         name: "twitter:description",
-        content:
-          "Picture Perfect Site generates a website from your uploaded images, creating a unique online presence.",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5720b90a-e514-4d80-8d0a-07e57feb5b77/id-preview-9ac88f9b--79d039fa-a9f1-4475-b73a-d1fd5158350d.lovable.app-1777112239002.png",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5720b90a-e514-4d80-8d0a-07e57feb5b77/id-preview-9ac88f9b--79d039fa-a9f1-4475-b73a-d1fd5158350d.lovable.app-1777112239002.png",
+        content: "Cozy crochet treasures made stitch by stitch for memorable gifting.",
       },
     ],
     links: [

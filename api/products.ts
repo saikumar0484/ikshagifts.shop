@@ -10,7 +10,8 @@ export default async function handler(req: any, res: any) {
     json(res, 400, { error: "Unknown product category." });
     return;
   }
-  const products = await getCatalog(category ? category : undefined);
+  const categoryFilter = category && isProductCategory(category) ? category : undefined;
+  const products = await getCatalog(categoryFilter);
   json(res, 200, {
     products: products.filter((product) => product.isAvailable !== false),
     usingFallback: products === fallbackCatalog,

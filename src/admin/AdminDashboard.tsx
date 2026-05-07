@@ -4,6 +4,7 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardList,
+  Download,
   IndianRupee,
   Inbox,
   KeyRound,
@@ -66,10 +67,18 @@ type CustomerRow = {
 type OrderRow = {
   id: string;
   amount: number;
+  subtotal_amount?: number | null;
+  discount_amount?: number | null;
+  coupon_code?: string | null;
   currency: string;
   items: Array<{ name: string; quantity: number; lineTotal: number }>;
   status: string;
   payment_status: string;
+  payment_method?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  shipping_address?: string | null;
+  pin_code?: string | null;
   tracking_number: string | null;
   estimated_delivery: string | null;
   created_at: string;
@@ -153,6 +162,16 @@ async function api<T>(path: string, options: RequestInit = {}) {
 function whatsappLink(phone: string, message: string) {
   const normalized = phone.replace(/[^\d]/g, "");
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+}
+
+function csvCell(value: unknown) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function orderItemsText(order: OrderRow) {
+  return (order.items || [])
+    .map((item) => `${item.name} x ${item.quantity} (${formatPrice(item.lineTotal || 0)})`)
+    .join("; ");
 }
 
 function StatCard({
@@ -244,10 +263,59 @@ export function AdminDashboard() {
   const filteredOrders = useMemo(() => {
     const term = orderSearch.toLowerCase();
     return orders.filter((order) => {
-      const text = `${order.id} ${order.customer?.name || ""} ${order.customer?.phone || ""} ${order.status}`;
+      const text = `${order.id} ${order.customer_name || order.customer?.name || ""} ${order.customer_phone || order.customer?.phone || ""} ${order.shipping_address || ""} ${order.pin_code || ""} ${order.status}`;
       return text.toLowerCase().includes(term);
     });
   }, [orders, orderSearch]);
+
+  const exportOrdersCsv = () => {
+    const headers = [
+      "Order ID",
+      "Date",
+      "Customer Name",
+      "Mobile Number",
+      "Address",
+      "Pin Code",
+      "Payment Option",
+      "Status",
+      "Payment Status",
+      "Subtotal",
+      "Discount",
+      "Coupon",
+      "Total",
+      "Items",
+      "Tracking Number",
+      "Estimated Delivery",
+    ];
+    const rows = filteredOrders.map((order) => [
+      order.id,
+      new Date(order.created_at).toLocaleString(),
+      order.customer_name || order.customer?.name || "",
+      order.customer_phone || order.customer?.phone || "",
+      order.shipping_address || "",
+      order.pin_code || "",
+      order.payment_method || "",
+      order.status.replaceAll("_", " "),
+      order.payment_status,
+      order.subtotal_amount ?? order.amount,
+      order.discount_amount ?? 0,
+      order.coupon_code || "",
+      order.amount,
+      orderItemsText(order),
+      order.tracking_number || "",
+      order.estimated_delivery || "",
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `iksha-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const filteredProducts = useMemo(
     () =>
@@ -761,15 +829,25 @@ export function AdminDashboard() {
 
         {tab === "orders" && (
           <section className="space-y-5">
-            <label className="flex max-w-xl items-center gap-3 rounded-full border border-border bg-card px-5 py-3 text-sm text-muted-foreground">
-              <Search size={18} />
-              <input
-                value={orderSearch}
-                onChange={(event) => setOrderSearch(event.target.value)}
-                placeholder="Search order, customer, phone, status"
-                className="w-full bg-transparent outline-none"
-              />
-            </label>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <label className="flex max-w-xl flex-1 items-center gap-3 rounded-full border border-border bg-card px-5 py-3 text-sm text-muted-foreground">
+                <Search size={18} />
+                <input
+                  value={orderSearch}
+                  onChange={(event) => setOrderSearch(event.target.value)}
+                  placeholder="Search order, customer, phone, status, address"
+                  className="w-full bg-transparent outline-none"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={exportOrdersCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground"
+              >
+                <Download size={16} />
+                Export Excel CSV
+              </button>
+            </div>
             <div className="grid gap-4">
               {filteredOrders.map((order) => (
                 <article key={order.id} className="rounded-2xl border border-border bg-card p-5">
@@ -783,6 +861,28 @@ export function AdminDashboard() {
                       <p className="mt-2 text-sm capitalize text-primary">
                         {order.status.replaceAll("_", " ")} · {order.payment_status}
                       </p>
+                      <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
+                        <p>
+                          <span className="font-semibold text-foreground">Checkout name:</span>{" "}
+                          {order.customer_name || order.customer?.name || "Not added"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Mobile:</span>{" "}
+                          {order.customer_phone || order.customer?.phone || "Not added"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Address:</span>{" "}
+                          {order.shipping_address || "Not added"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Pin code:</span>{" "}
+                          {order.pin_code || "Not added"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Payment:</span>{" "}
+                          {(order.payment_method || "cod").replaceAll("_", " ")}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {order.customer?.phone && (

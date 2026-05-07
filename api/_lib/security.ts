@@ -80,7 +80,7 @@ export async function rateLimit(
 
 export function safeString(value: unknown, maxLength: number) {
   return String(value ?? "")
-    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\p{Cc}/gu, "")
     .trim()
     .slice(0, maxLength);
 }

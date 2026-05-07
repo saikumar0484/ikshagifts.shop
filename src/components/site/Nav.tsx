@@ -12,7 +12,6 @@ import { collectionNav } from "@/data/storefront";
 import { useCommerce } from "@/lib/commerce";
 
 const links = [
-  { href: "#featured-products", label: "Featured" },
   { href: "#best-selling-products", label: "Best Sellers" },
   { href: "#reviews", label: "Reviews" },
   { href: "#gift-experience", label: "Gift Experience" },
@@ -66,27 +65,18 @@ export function Nav() {
                       }`}
                     >
                       <div className="font-display text-2xl">{item.label}</div>
-                      <div
-                        className={`mt-1 text-sm ${
-                          activeCollection === item.slug
-                            ? "text-primary-foreground/80"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {item.blurb}
-                      </div>
                     </a>
                   ))}
                 </div>
                 <div className="rounded-[1.6rem] bg-secondary/75 p-5">
                   <p className="text-xs uppercase tracking-[0.25em] text-primary">
-                    Today&apos;s rush
+                    Need help choosing?
                   </p>
                   <p className="mt-3 font-display text-3xl text-foreground">
-                    Limited custom orders available today
+                    Pick a gift that feels personal
                   </p>
                   <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                    Order before 5PM for faster dispatch and a gift-ready finish.
+                    Tell us the occasion and we will help with colors, wrapping, and message cards.
                   </p>
                   <div className="mt-5 flex gap-2">
                     <a
@@ -125,7 +115,7 @@ export function Nav() {
 
         <div className="hidden flex-1 items-center justify-end gap-3 md:flex">
           <a
-            href="#featured-products"
+            href="#best-selling-products"
             className="flex max-w-xs flex-1 items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:border-primary"
           >
             <Search size={16} />

@@ -1,12 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { json, method, readBody } from "../_lib/http.js";
-import {
-  createOtp,
-  createPendingSignup,
-  normalizeSignupInput,
-  sendEmailOtp,
-} from "../_lib/otp.js";
+import { createOtp, createPendingSignup, normalizeSignupInput, sendEmailOtp } from "../_lib/otp.js";
 import { assertSameOrigin, rateLimit, requireJson } from "../_lib/security.js";
 import { getUserByEmail, getUserByPhone } from "../_lib/session.js";
 

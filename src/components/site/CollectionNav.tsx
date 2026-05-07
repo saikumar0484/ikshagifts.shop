@@ -21,13 +21,6 @@ export function CollectionNav({ active }: CollectionNavProps) {
               }`}
             >
               <p className="font-display text-2xl">{item.label}</p>
-              <p
-                className={`mt-2 text-sm leading-6 ${
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground"
-                }`}
-              >
-                {item.blurb}
-              </p>
             </a>
           );
         })}

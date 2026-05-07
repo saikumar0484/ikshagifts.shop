@@ -8,6 +8,7 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 
 - Storefront: `https://ikshagifts.shop`
 - Admin dashboard: `https://admin.ikshagifts.shop`
+- Current Codex cloud preview alias: `https://ikshagiftsshop-main.vercel.app`
 - Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-clxzq6bzp.vercel.app`
 - Latest preview deployment for the visual-first hero refinement: `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
 
@@ -40,7 +41,7 @@ What is working:
 - Homepage now has a premium gifting-focused redesign preview with:
   - new welcome offer announcement bar
   - new visual-first hero with collections rail and image slider
-  - women / men / custom collections
+  - men / custom collections aligned with the supported Supabase categories
   - featured and best-selling product sections
   - social proof and gift experience sections
   - floating WhatsApp CTA
@@ -58,7 +59,7 @@ What is working:
 What is not fully finished yet:
 
 - Automated phone or WhatsApp OTP still depends on a real provider being configured
-- Razorpay is intentionally paused until business-side verification is complete
+- Razorpay checkout code is now wired for `Pay With UPI / Cards`; real payment testing is waiting for `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - There is no in-app admin password change screen yet
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
@@ -102,6 +103,8 @@ Required Vercel/Supabase environment variables:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SESSION_SECRET`
 - `ADMIN_PASSWORD` or `ADMIN_API_KEY` for initial owner setup flows
+- `RAZORPAY_KEY_ID` for Razorpay Checkout
+- `RAZORPAY_KEY_SECRET` for server-side Razorpay order creation and payment signature verification
 - Optional integration variables depend on the email/WhatsApp providers configured in the admin dashboard
 
 Local build check:
@@ -135,8 +138,7 @@ Vercel deployment:
 
 - Replaced the old top strip text with the welcome-offer announcement
 - Added a new premium hero with headline, subtext, urgency copy, and CTA buttons
-- Added 3 main collection routes:
-  - `/collections/women`
+- Added 2 main collection routes:
   - `/collections/men`
   - `/collections/custom`
 - Reworked the product cards for tighter spacing, 2-up mobile layout, and direct add-to-cart / buy-now actions
@@ -367,7 +369,22 @@ Also note:
 
 ### Razorpay
 
-Razorpay is intentionally skipped for now because business-side verification is still pending.
+Razorpay checkout is implemented for the cart payment option `Pay With UPI / Cards`.
+
+Current flow:
+
+- Frontend loads `https://checkout.razorpay.com/v1/checkout.js`
+- Frontend posts cart, coupon, and checkout details to `POST /api/payments/verify?action=create-order`
+- Server creates a Razorpay order and stores a pending Supabase order with `razorpay_order_id`
+- Razorpay Checkout opens for UPI / cards
+- On successful payment, frontend posts the Razorpay payment ID, order ID, and signature to `POST /api/payments/verify`
+- Server verifies `razorpay_order_id|razorpay_payment_id`, marks the order paid, stores `payment_id`, and shows `Order Has Been Placed. Congratulations!`
+
+Required before real payment testing:
+
+- Add `RAZORPAY_KEY_ID` locally and in Vercel
+- Add `RAZORPAY_KEY_SECRET` locally and in Vercel
+- Do not commit either value, and never publish the secret key in README/checkpoints/chat
 
 ## Admin login handoff
 
@@ -477,3 +494,17 @@ If a future session needs to continue this project, start with this order:
 This README is intentionally detailed, but it still does not include secrets, owner passwords, Supabase secret keys, or other sensitive values.
 
 That is deliberate. Use the ignored local files on this machine for those values, not Git.
+
+## Codex working memory
+
+The owner asked Codex to treat this repository as the durable memory for the project. Future Codex sessions should not rely on hidden chat memory alone.
+
+Whenever the owner asks for changes, fixes, deployment work, setup help, or business decisions:
+
+- Read this README and `CODEX_CHECKPOINTS.md` first.
+- After meaningful work, update this README or `CODEX_CHECKPOINTS.md` with what changed, what was verified, and any remaining risk.
+- Always give the owner a preview link after changes.
+- Do not publish, deploy production, or make anything live until the owner explicitly says to go live or publish.
+- Keep notes short, practical, and useful for the next session.
+- Do not remove older handoff notes unless they are clearly obsolete and replaced with newer truth.
+- If a change affects live setup, auth, payments, database, products, admin, or deployment, record it here before finishing.

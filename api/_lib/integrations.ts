@@ -54,7 +54,9 @@ const defaultIntegrations: Record<IntegrationView["key"], Omit<IntegrationView, 
 
 function secretKey() {
   return createHash("sha256")
-    .update(process.env.INTEGRATION_SECRET || process.env.SESSION_SECRET || "replace-integration-secret")
+    .update(
+      process.env.INTEGRATION_SECRET || process.env.SESSION_SECRET || "replace-integration-secret",
+    )
     .digest();
 }
 
@@ -108,7 +110,12 @@ function normalizePublicConfig(key: IntegrationView["key"], body: Record<string,
   };
 }
 
-function statusFor(key: IntegrationView["key"], enabled: boolean, provider: string, secrets: Record<string, string>) {
+function statusFor(
+  key: IntegrationView["key"],
+  enabled: boolean,
+  provider: string,
+  secrets: Record<string, string>,
+) {
   if (!enabled) return "needs_setup";
   if (key === "whatsapp" && provider === "manual") return "manual";
   return Object.values(secrets || {}).some(Boolean) ? "ready" : "needs_setup";
@@ -149,7 +156,10 @@ export async function saveIntegration(body: Record<string, unknown>) {
 
   const existing = await db.selectOne<IntegrationRow>("integration_settings", { key });
   const provider = safeString(body.provider || defaultIntegrations[key].provider, 40);
-  const publicConfig = normalizePublicConfig(key, (body.publicConfig || {}) as Record<string, unknown>);
+  const publicConfig = normalizePublicConfig(
+    key,
+    (body.publicConfig || {}) as Record<string, unknown>,
+  );
   const inputSecrets = (body.secrets || {}) as Record<string, unknown>;
   const encryptedSecrets = { ...(existing?.encrypted_secrets || {}) };
 

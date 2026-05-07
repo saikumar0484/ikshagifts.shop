@@ -1471,7 +1471,7 @@ Live smoke check:
 
 ## Checkpoint 31 - CSP And Broken Placeholder Image Fix
 
-Status: Local implementation completed, ready for production deployment.
+Status: Production deployed and pushed to GitHub.
 
 Date: 2026-05-07
 
@@ -1507,4 +1507,28 @@ Result:
 
 Deployment:
 
-- Pending in this checkpoint until the production Vercel deploy completes.
+- Production deployment completed:
+
+```text
+https://iksha-gifts-supabase-commerce-9qruqkykh.vercel.app
+```
+
+- Vercel aliased the deployment to:
+
+```text
+https://ikshagifts.shop
+```
+
+GitHub:
+
+```text
+d0990ed Fix CSP and product image fallbacks
+3f103b0 Normalize product placeholders in API
+```
+
+Live smoke check:
+
+- `https://ikshagifts.shop` returned HTTP 200.
+- Live CSP includes `https://static.cloudflareinsights.com`.
+- `https://ikshagifts.shop/api/products` returned HTTP 200.
+- API product rows with `via.placeholder.com` after normalization: `0`.

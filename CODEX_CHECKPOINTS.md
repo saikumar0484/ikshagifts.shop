@@ -891,7 +891,7 @@ What changed:
 
 - Added `api/_lib/whatsapp.ts`.
 - Added webhook endpoint `api/whatsapp/webhook.ts`.
-- Added SSE update endpoint `api/support/stream.ts`.
+- Added realtime-like support refresh in the admin dashboard. It uses lightweight polling to stay within the Vercel Hobby function limit.
 - Extended `api/admin.ts` with support REST actions:
   - `support`
   - `support-conversation`
@@ -916,7 +916,7 @@ What changed:
 - Added an admin Support tab in `src/admin/AdminDashboard.tsx`:
   - conversation list
   - search and status filters
-  - realtime-ish SSE refresh
+  - realtime-ish polling refresh
   - message thread
   - template buttons
   - AI-style reply suggestions

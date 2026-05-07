@@ -56,7 +56,7 @@ What is working:
   - webhook endpoint at `/api/whatsapp/webhook`
   - official Cloud API send path using phone number ID and access token
   - conversation inbox, search, status filters, assignment, templates, notes, order sidebar, and AI-style reply suggestions
-  - SSE update endpoint at `/api/support/stream`
+  - lightweight in-dashboard polling for new messages to stay within the Vercel Hobby function limit
 - Storefront collections query Supabase by category, for example `/api/products?category=men`
 - DB-backed owner login for the admin dashboard
 - Supabase-backed products, customers, orders, integration settings, and admin sessions

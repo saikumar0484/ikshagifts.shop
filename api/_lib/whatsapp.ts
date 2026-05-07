@@ -397,6 +397,7 @@ async function upsertConversationFromInbound(message: any, contact: any) {
         { ...payload, created_at: nowIso() },
         "wa_id",
       );
+  if (!conversation) throw new Error("WhatsApp conversation could not be saved.");
   await db.upsert<MessageRow>(
     "whatsapp_messages",
     {

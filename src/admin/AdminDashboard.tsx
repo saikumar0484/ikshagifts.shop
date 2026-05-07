@@ -416,14 +416,12 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (!admin) return undefined;
-    const events = new EventSource("/api/support/stream");
-    events.addEventListener("support_update", () => {
+    const timer = window.setInterval(() => {
       api<SupportWorkspace>("/api/admin?action=support")
         .then((data) => setSupport(data))
         .catch(() => undefined);
-    });
-    events.onerror = () => events.close();
-    return () => events.close();
+    }, 12000);
+    return () => window.clearInterval(timer);
   }, [admin]);
 
   const filteredOrders = useMemo(() => {

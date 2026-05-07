@@ -1532,3 +1532,42 @@ Live smoke check:
 - Live CSP includes `https://static.cloudflareinsights.com`.
 - `https://ikshagifts.shop/api/products` returned HTTP 200.
 - API product rows with `via.placeholder.com` after normalization: `0`.
+
+## Checkpoint 32 - Razorpay Checkout CSP Frame Fix
+
+Status: Local implementation completed, ready for production deployment.
+
+Date: 2026-05-07
+
+Goal:
+
+- Fix the `This content is blocked` browser issue that appeared after clicking `Place Your Order` when Razorpay Checkout tried to open.
+- Keep the security policy tight while allowing Razorpay's checkout frame/API domains.
+
+What changed:
+
+- Updated `vercel.json` Content Security Policy:
+  - `connect-src` now allows `https://*.razorpay.com`
+  - `frame-src` now allows `https://*.razorpay.com`
+  - `form-action` now allows `https://*.razorpay.com`
+- Updated `Permissions-Policy` so browser payment features are allowed for this site and Razorpay checkout/API origins.
+
+Reason:
+
+- Razorpay's official Standard Checkout loads `https://checkout.razorpay.com/v1/checkout.js`.
+- Razorpay's official API gateway uses `https://api.razorpay.com/v1`.
+- The previous CSP only allowed a narrow checkout script/frame origin and could block the payment frame or network calls during checkout.
+
+Verification:
+
+```powershell
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- Vite production build passed.
+
+Deployment:
+
+- Pending in this checkpoint until the production Vercel deploy completes.

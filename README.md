@@ -65,6 +65,7 @@ What is working:
 - Supabase-backed products, customers, orders, integration settings, and admin sessions
 - Security headers via `vercel.json`
 - CSP allows the required Razorpay checkout script and Cloudflare analytics script while keeping the rest of the policy locked down
+- Razorpay checkout is allowed in CSP through Razorpay frame, connect, and form-action origins so the hosted payment modal can open after Place Your Order
 
 What is not fully finished yet:
 

@@ -23,9 +23,9 @@ export function method(req: any, res: any, allowed: string[]) {
   return false;
 }
 
-export async function readBody(req: any) {
+export async function readBody(req: any, maxBodyBytes = MAX_BODY_BYTES) {
   const declaredLength = Number(req.headers["content-length"] || 0);
-  if (declaredLength > MAX_BODY_BYTES) throw new Error("Request body is too large.");
+  if (declaredLength > maxBodyBytes) throw new Error("Request body is too large.");
 
   if (req.body && typeof req.body === "object") return req.body;
   if (typeof req.body === "string") return JSON.parse(req.body || "{}");
@@ -35,7 +35,7 @@ export async function readBody(req: any) {
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > MAX_BODY_BYTES) throw new Error("Request body is too large.");
+    if (size > maxBodyBytes) throw new Error("Request body is too large.");
     chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8");

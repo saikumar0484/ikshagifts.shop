@@ -786,6 +786,95 @@ Preview:
 https://ikshagiftsshop-main.vercel.app
 ```
 
+## Checkpoint 27 - Admin Control Center Product/Stock Foundation
+
+Status: Preview deployment completed.
+
+Date: 2026-05-07
+
+Goal:
+
+- Make the admin dashboard the practical controller for products, stock, availability, image uploads, orders, and storefront refresh.
+
+What changed:
+
+- Added `catalog_versions` SQL setup for Supabase Realtime product refresh signals.
+- Added public `product-images` Supabase Storage bucket setup in `supabase/schema.sql`.
+- Added admin image upload endpoint: `POST /api/admin?action=product-image`.
+- Product create/update/delete and inline stock/availability edits now bump `catalog_versions`.
+- Storefront subscribes to the catalog version signal and refetches `/api/products` after product changes.
+- Storefront cart blocks hidden/out-of-stock items and clamps quantity to available stock.
+- COD/UPI orders deduct stock after order creation.
+- Razorpay paid orders deduct stock after successful signature verification.
+- Admin Product List now has search, category filter, status filter, inline stock controls, and show/hide toggle.
+- Dashboard overview now shows active products, hidden products, pending orders, unread inbox, and needs-attention cards.
+- Updated README with the new environment variables and deployment setup notes.
+
+Verification:
+
+```powershell
+node .\node_modules\vite\bin\vite.js build
+node .\node_modules\eslint\bin\eslint.js .
+```
+
+Result:
+
+- Production build passed.
+- Lint passed with 0 errors and existing Fast Refresh warnings only.
+- Updated `supabase/schema.sql` was applied to the Supabase project.
+- Verified `catalog_versions`, normalized product categories, and `product-images` through Supabase APIs.
+- Preview deployment build completed without the earlier API upload TypeScript warning.
+- Verified protected preview product APIs using `vercel curl`:
+  - `/api/products?category=men`
+  - `/api/products?category=customized_gifts`
+
+Preview:
+
+```text
+https://iksha-gifts-supabase-commerce-4bwnsg42y.vercel.app
+```
+
+Important note:
+
+- The preview is protected by Vercel Deployment Protection. Use Vercel login/bypass to open it in a browser.
+- Production was not promoted.
+
+## Checkpoint 26 - Safe WhatsApp Web Contact Manager
+
+Status: Local admin UI change completed.
+
+Date: 2026-05-07
+
+Goal:
+
+- Support WhatsApp customer management without a paid WhatsApp API provider.
+- Avoid storing, scraping, or automating the owner's WhatsApp Web session.
+
+What changed:
+
+- Updated `src/admin/AdminDashboard.tsx`.
+- Added a WhatsApp Web QR login panel inside the Integrations tab.
+- The panel opens the official `https://web.whatsapp.com/` screen, where the owner can scan the QR from the WhatsApp mobile app.
+- Added a customer chat manager in the Integrations tab:
+  - search customer contacts by name, email, or phone
+  - open a normal WhatsApp chat
+  - open a prefilled order-update WhatsApp chat
+
+Verification:
+
+```powershell
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- Build passed.
+- No new WhatsApp API keys or provider accounts are required for the manual chat workflow.
+
+Important note:
+
+- The official WhatsApp Web QR is opened in a separate secure browser tab. It is not embedded inside the admin page because WhatsApp Web blocks embedding and unofficial automation can create legal/account risk.
+
 Important note:
 
 - This is a cloud preview/public Vercel alias, not the main `https://ikshagifts.shop` production website.

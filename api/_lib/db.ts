@@ -2,9 +2,10 @@ type SupabaseOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   prefer?: string;
+  headers?: Record<string, string>;
 };
 
-function config() {
+export function supabaseConfig() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -17,7 +18,7 @@ function config() {
 }
 
 async function request<T>(path: string, options: SupabaseOptions = {}) {
-  const { url, key } = config();
+  const { url, key } = supabaseConfig();
   const response = await fetch(`${url}/rest/v1${path}`, {
     method: options.method ?? "GET",
     headers: {
@@ -25,6 +26,7 @@ async function request<T>(path: string, options: SupabaseOptions = {}) {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
       ...(options.prefer ? { Prefer: options.prefer } : {}),
+      ...(options.headers ?? {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -98,3 +100,32 @@ export const db = {
     await request(`/${table}?${filterQuery(filters)}`, { method: "DELETE" });
   },
 };
+
+export async function uploadStorageObject(
+  bucket: string,
+  path: string,
+  bytes: Uint8Array,
+  contentType: string,
+) {
+  const { url, key } = supabaseConfig();
+  const encodedPath = path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const response = await fetch(`${url}/storage/v1/object/${bucket}/${encodedPath}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": contentType,
+      "x-upsert": "true",
+    },
+    body: Buffer.from(bytes),
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || "Image upload failed.");
+  }
+  return `${url}/storage/v1/object/public/${bucket}/${encodedPath}`;
+}

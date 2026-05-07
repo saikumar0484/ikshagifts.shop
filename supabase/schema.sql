@@ -103,6 +103,13 @@ create table if not exists public.products (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.catalog_versions (
+  key text primary key,
+  reason text not null default 'manual',
+  version uuid not null default gen_random_uuid(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.inbox_messages (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -135,6 +142,7 @@ alter table public.admin_sessions enable row level security;
 alter table public.carts enable row level security;
 alter table public.orders enable row level security;
 alter table public.products enable row level security;
+alter table public.catalog_versions enable row level security;
 alter table public.inbox_messages enable row level security;
 alter table public.rate_limits enable row level security;
 alter table public.integration_settings enable row level security;
@@ -170,16 +178,73 @@ alter table public.products
 alter table public.products
   add constraint products_category_check check (category in ('women', 'men', 'customized_gifts'));
 
+create or replace function public.set_products_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists products_set_updated_at on public.products;
+create trigger products_set_updated_at
+before update on public.products
+for each row
+execute function public.set_products_updated_at();
+
+revoke execute on function public.set_products_updated_at() from public;
+
 create index if not exists orders_user_created_idx on public.orders(user_id, created_at desc);
 create index if not exists pending_signups_expires_idx on public.pending_signups(expires_at);
 create index if not exists admin_users_role_active_idx on public.admin_users(role, is_active);
 create index if not exists admin_sessions_expires_idx on public.admin_sessions(expires_at);
 create index if not exists products_available_sort_idx on public.products(is_available, sort_order, name);
 create index if not exists products_category_available_idx on public.products(category, is_available, sort_order, name);
+create index if not exists catalog_versions_updated_idx on public.catalog_versions(updated_at desc);
 create index if not exists inbox_messages_created_idx on public.inbox_messages(created_at desc);
 create index if not exists inbox_messages_read_idx on public.inbox_messages(is_read, created_at desc);
 create index if not exists rate_limits_reset_idx on public.rate_limits(reset_at);
 create index if not exists integration_settings_updated_idx on public.integration_settings(updated_at desc);
+
+drop policy if exists "Public can read catalog versions" on public.catalog_versions;
+create policy "Public can read catalog versions"
+  on public.catalog_versions
+  for select
+  to anon, authenticated
+  using (true);
+
+insert into public.catalog_versions (key, reason)
+values ('products', 'initial')
+on conflict (key) do nothing;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'product-images',
+  'product-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = true,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Public can view product images" on storage.objects;
+create policy "Public can view product images"
+  on storage.objects
+  for select
+  using (bucket_id = 'product-images');
+
+do $$
+begin
+  alter publication supabase_realtime add table public.catalog_versions;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end $$;
 
 insert into public.products (
   id,
@@ -228,6 +293,7 @@ on conflict (id) do update set
 
 grant usage on schema public to service_role;
 grant select, insert, update, delete on all tables in schema public to service_role;
+grant select on public.catalog_versions to anon, authenticated;
 grant usage, select on all sequences in schema public to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;
 alter default privileges in schema public grant usage, select on sequences to service_role;

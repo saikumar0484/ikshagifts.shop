@@ -11,6 +11,7 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 - Current Codex cloud preview alias: `https://ikshagiftsshop-main.vercel.app`
 - Current production deployment alias target during the latest update: `https://iksha-gifts-supabase-commerce-clxzq6bzp.vercel.app`
 - Latest preview deployment for the visual-first hero refinement: `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
+- Latest protected preview for Admin Control Center work: `https://iksha-gifts-supabase-commerce-4bwnsg42y.vercel.app`
 
 ## What this project is
 
@@ -51,6 +52,10 @@ What is working:
 - Admin dashboard on `admin.ikshagifts.shop`
 - Admin inbox with read/unread and delete actions
 - Admin product workflows for adding, editing, deleting, and filtering by category
+- Admin WhatsApp integration now supports a safe WhatsApp Web workflow:
+  - open official WhatsApp Web QR login from the dashboard
+  - search customer phone contacts from the customer database
+  - open prefilled WhatsApp chat links for customer support and order updates
 - Storefront collections query Supabase by category, for example `/api/products?category=men`
 - DB-backed owner login for the admin dashboard
 - Supabase-backed products, customers, orders, integration settings, and admin sessions
@@ -59,11 +64,26 @@ What is working:
 What is not fully finished yet:
 
 - Automated phone or WhatsApp OTP still depends on a real provider being configured
+- WhatsApp Web login is intentionally opened through the official WhatsApp Web tab. The dashboard does not store or automate the WhatsApp session.
 - Razorpay checkout code is now wired for `Pay With UPI / Cards`; real payment testing is waiting for `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
 - There is no in-app admin password change screen yet
 - Image optimization can still be improved further with WebP or AVIF and possibly local font hosting
 
 ## Latest major work completed
+
+### Admin Control Center foundation
+
+- Added `catalog_versions` as the Supabase Realtime refresh signal for product/catalog edits
+- Added Supabase Storage bucket setup for public `product-images`
+- Added admin image upload API: `POST /api/admin?action=product-image`
+- Product create, update, delete, stock changes, availability changes, and order stock deduction now bump the catalog version
+- Storefront subscribes to `catalog_versions` using the public Supabase URL/key and refetches `/api/products` after product updates
+- Storefront cart now blocks hidden/out-of-stock products and clamps cart quantity to stock
+- COD/UPI orders deduct product stock after order creation; paid Razorpay orders deduct stock after signature verification
+- Admin Product List now supports search, category filter, status filter, inline stock controls, and show/hide toggle
+- Dashboard overview now includes active/hidden products, pending orders, unread messages, and missing-image attention cards
+- Supabase production schema was updated on 2026-05-07 for `catalog_versions` and `product-images`
+- Separate Vercel protected preview was deployed at `https://iksha-gifts-supabase-commerce-4bwnsg42y.vercel.app`
 
 ### Admin inbox and category-based product management
 
@@ -101,6 +121,8 @@ Required Vercel/Supabase environment variables:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 - `SESSION_SECRET`
 - `ADMIN_PASSWORD` or `ADMIN_API_KEY` for initial owner setup flows
 - `RAZORPAY_KEY_ID` for Razorpay Checkout
@@ -119,7 +141,8 @@ Vercel deployment:
 1. Link the Vercel project to this repository.
 2. Add the environment variables above in Vercel Project Settings.
 3. Run `supabase/schema.sql` against the Supabase project before first production use.
-4. Deploy with Vercel. The project uses Vite and the existing `vercel.json` API route setup.
+4. Confirm `catalog_versions` is enabled in Supabase Realtime and the `product-images` bucket exists.
+5. Deploy with Vercel. The project uses Vite and the existing `vercel.json` API route setup.
 
 ### Visual-first hero refinement
 
@@ -314,6 +337,8 @@ Current important tables:
 - `carts`
 - `orders`
 - `products`
+- `catalog_versions`
+- `inbox_messages`
 - `rate_limits`
 - `integration_settings`
 - `admin_users`

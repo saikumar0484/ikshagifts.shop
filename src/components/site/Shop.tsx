@@ -31,8 +31,10 @@ const collectionPills: Array<{ slug: ProductCollection; href: string; label: str
 function ProductCard({ product }: { product: Product }) {
   const { addToCart, setCartOpen } = useCommerce();
   const [showDescription, setShowDescription] = useState(false);
+  const isUnavailable = product.isAvailable === false || (product.stockQuantity ?? 1) <= 0;
 
   const buyNow = () => {
+    if (isUnavailable) return;
     addToCart(product.id);
     setCartOpen(true);
   };
@@ -56,7 +58,7 @@ function ProductCard({ product }: { product: Product }) {
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <span className="absolute left-2 top-2 rounded-full bg-card/92 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary backdrop-blur">
-            {product.tag}
+            {isUnavailable ? "Out of stock" : product.tag}
           </span>
         </div>
       </button>
@@ -92,9 +94,15 @@ function ProductCard({ product }: { product: Product }) {
             href={product.cartUrl}
             onClick={(event) => {
               event.preventDefault();
+              if (isUnavailable) return;
               addToCart(product.id);
             }}
-            className="inline-flex items-center justify-center gap-1 rounded-full bg-primary px-2 py-1.5 text-[10px] font-semibold text-primary-foreground transition-transform hover:scale-[1.01] md:text-xs"
+            aria-disabled={isUnavailable}
+            className={`inline-flex items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[10px] font-semibold transition-transform md:text-xs ${
+              isUnavailable
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
+                : "bg-primary text-primary-foreground hover:scale-[1.01]"
+            }`}
           >
             <ShoppingBag size={12} />
             Add to Cart
@@ -102,7 +110,8 @@ function ProductCard({ product }: { product: Product }) {
           <button
             type="button"
             onClick={buyNow}
-            className="rounded-full border border-border bg-background px-2 py-1.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-secondary md:text-xs"
+            disabled={isUnavailable}
+            className="rounded-full border border-border bg-background px-2 py-1.5 text-[10px] font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground md:text-xs"
           >
             Buy Now
           </button>
@@ -148,6 +157,13 @@ export function Shop({ collectionSlug = null }: ShopProps) {
         if (!Array.isArray(data.products)) return;
         setCollectionProductsFromDb(
           data.products.map((product) => {
+            const row = product as Product & {
+              image_url?: string;
+              old_price?: number | null;
+              stock_quantity?: number;
+              is_available?: boolean;
+              sort_order?: number;
+            };
             const fallback = products.find((item) => item.id === product.id);
             const dbCategory = product.categorySlug || product.category;
             return {
@@ -157,11 +173,19 @@ export function Shop({ collectionSlug = null }: ShopProps) {
               collection: categoryToCollection[category],
               tag: product.tag || fallback?.tag || "New",
               desc: product.desc || fallback?.desc || "",
-              image: product.imageUrl || product.image || fallback?.image || products[0].image,
+              image:
+                product.imageUrl ||
+                row.image_url ||
+                product.image ||
+                fallback?.image ||
+                products[0].image,
               cartUrl: product.cartUrl || fallback?.cartUrl || `/cart/add/${product.id}`,
-              oldPrice: product.oldPrice ?? fallback?.oldPrice,
+              oldPrice: product.oldPrice ?? row.old_price ?? fallback?.oldPrice,
               rating: product.rating ?? fallback?.rating ?? 4.8,
               delivery: product.delivery || fallback?.delivery || "",
+              stockQuantity: product.stockQuantity ?? row.stock_quantity ?? fallback?.stockQuantity,
+              isAvailable: product.isAvailable ?? row.is_available ?? fallback?.isAvailable ?? true,
+              sortOrder: product.sortOrder ?? row.sort_order ?? fallback?.sortOrder,
             };
           }),
         );

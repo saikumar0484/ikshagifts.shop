@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { randomUUID } from "node:crypto";
-import { priceCart } from "./_lib/catalog.js";
+import { deductProductStock, priceCart } from "./_lib/catalog.js";
 import { db } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "./_lib/security.js";
@@ -127,6 +127,7 @@ export default async function handler(req: any, res: any) {
       ],
     });
 
+    await deductProductStock(priced.lines);
     await db.upsert("carts", { user_id: user.id, items: [] }, "user_id");
     json(res, 201, { order });
   } catch (error) {

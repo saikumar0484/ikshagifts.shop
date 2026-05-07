@@ -14,6 +14,7 @@ import {
   Product,
   products,
 } from "@/data/products";
+import { subscribeToCatalogChanges } from "@/lib/catalogRealtime";
 
 type User = {
   id: string;
@@ -162,6 +163,28 @@ type IdleWindow = Window & {
   cancelIdleCallback?: (id: number) => void;
 };
 
+type ManagedProductRow = Product & {
+  imageUrl?: string;
+  image_url?: string;
+  cartUrl?: string;
+  cart_url?: string;
+  categorySlug?: string;
+  desc?: string;
+  description?: string;
+  collection?: Product["collection"];
+  old_price?: number | null;
+  stockQuantity?: number;
+  stock_quantity?: number;
+  isAvailable?: boolean;
+  is_available?: boolean;
+  isFeatured?: boolean;
+  is_featured?: boolean;
+  isBestSeller?: boolean;
+  is_best_seller?: boolean;
+  sortOrder?: number;
+  sort_order?: number;
+};
+
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -213,6 +236,43 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
   const [checkout, setCheckout] = useState<CheckoutState>({ status: "idle", message: "" });
   const [pendingSignupId, setPendingSignupId] = useState("");
 
+  const loadProducts = useCallback(async () => {
+    const data = await api<{ products: ManagedProductRow[] }>("/api/products");
+    if (!data.products?.length) return;
+    setManagedProducts(
+      data.products.map((product) => {
+        const fallback = products.find((item) => item.id === product.id);
+        const dbCategory = product.categorySlug || product.category;
+        const managedCategory = isProductCategory(dbCategory) ? dbCategory : null;
+        return {
+          ...product,
+          category: managedCategory
+            ? categoryLabel(managedCategory)
+            : product.category || fallback?.category || "Gifts",
+          categorySlug: managedCategory || fallback?.categorySlug,
+          tag: product.tag || fallback?.tag || "New",
+          desc: product.desc || product.description || fallback?.desc || "",
+          image: product.imageUrl || product.image_url || fallback?.image || products[0].image,
+          cartUrl:
+            product.cartUrl || product.cart_url || fallback?.cartUrl || `/cart/add/${product.id}`,
+          oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,
+          rating: product.rating ?? fallback?.rating ?? 4.8,
+          delivery: product.delivery || fallback?.delivery || "Ships in 4-6 days",
+          collection:
+            product.collection ||
+            (managedCategory ? categoryToCollection[managedCategory] : fallback?.collection) ||
+            "custom",
+          stockQuantity: product.stockQuantity ?? product.stock_quantity ?? fallback?.stockQuantity,
+          isAvailable: product.isAvailable ?? product.is_available ?? fallback?.isAvailable ?? true,
+          isFeatured: product.isFeatured ?? product.is_featured ?? fallback?.isFeatured ?? false,
+          isBestSeller:
+            product.isBestSeller ?? product.is_best_seller ?? fallback?.isBestSeller ?? false,
+          sortOrder: product.sortOrder ?? product.sort_order ?? fallback?.sortOrder,
+        };
+      }),
+    );
+  }, []);
+
   useEffect(() => {
     const saved = window.localStorage.getItem(CART_KEY);
     if (saved) {
@@ -223,64 +283,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       api<{ user: User | null }>("/api/auth/me")
         .then((data) => setUser(data.user))
         .catch(() => undefined);
-      api<{
-        products: Array<
-          Product & {
-            imageUrl?: string;
-            image_url?: string;
-            cartUrl?: string;
-            cart_url?: string;
-            categorySlug?: string;
-            desc?: string;
-            description?: string;
-            collection?: Product["collection"];
-            old_price?: number | null;
-            isBestSeller?: boolean;
-            is_featured?: boolean;
-            is_best_seller?: boolean;
-          }
-        >;
-      }>("/api/products")
-        .then((data) => {
-          if (!data.products?.length) return;
-          setManagedProducts(
-            data.products.map((product) => {
-              const fallback = products.find((item) => item.id === product.id);
-              const dbCategory = product.categorySlug || product.category;
-              const managedCategory = isProductCategory(dbCategory) ? dbCategory : null;
-              return {
-                ...product,
-                category: managedCategory
-                  ? categoryLabel(managedCategory)
-                  : product.category || fallback?.category || "Gifts",
-                categorySlug: managedCategory || fallback?.categorySlug,
-                tag: product.tag || fallback?.tag || "New",
-                desc: product.desc || product.description || fallback?.desc || "",
-                image:
-                  product.imageUrl || product.image_url || fallback?.image || products[0].image,
-                cartUrl:
-                  product.cartUrl ||
-                  product.cart_url ||
-                  fallback?.cartUrl ||
-                  `/cart/add/${product.id}`,
-                oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,
-                rating: product.rating ?? fallback?.rating ?? 4.8,
-                delivery: product.delivery || fallback?.delivery || "Ships in 4-6 days",
-                collection:
-                  product.collection ||
-                  (managedCategory
-                    ? categoryToCollection[managedCategory]
-                    : fallback?.collection) ||
-                  "custom",
-                isFeatured:
-                  product.isFeatured ?? product.is_featured ?? fallback?.isFeatured ?? false,
-                isBestSeller:
-                  product.isBestSeller ?? product.is_best_seller ?? fallback?.isBestSeller ?? false,
-              };
-            }),
-          );
-        })
-        .catch(() => undefined);
+      loadProducts().catch(() => undefined);
     };
 
     const idleWindow = window as IdleWindow;
@@ -291,7 +294,15 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [loadProducts]);
+
+  useEffect(
+    () =>
+      subscribeToCatalogChanges(() => {
+        loadProducts().catch(() => undefined);
+      }),
+    [loadProducts],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -313,18 +324,42 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
     [cart, getProduct],
   );
 
-  const addToCart = useCallback((productId: string) => {
-    setCart((current) => {
-      const existing = current.find((line) => line.productId === productId);
-      if (existing) {
-        return current.map((line) =>
-          line.productId === productId ? { ...line, quantity: line.quantity + 1 } : line,
-        );
-      }
-      return [...current, { productId, quantity: 1 }];
-    });
-    setCartOpen(true);
-  }, []);
+  useEffect(() => {
+    setCart((current) =>
+      current.flatMap((line) => {
+        const product = managedProducts.find((item) => item.id === line.productId);
+        if (!product || product.isAvailable === false || (product.stockQuantity ?? 1) <= 0) {
+          return [];
+        }
+        return [
+          {
+            ...line,
+            quantity: Math.min(line.quantity, product.stockQuantity ?? line.quantity),
+          },
+        ];
+      }),
+    );
+  }, [managedProducts]);
+
+  const addToCart = useCallback(
+    (productId: string) => {
+      const product = managedProducts.find((item) => item.id === productId);
+      if (!product || product.isAvailable === false || (product.stockQuantity ?? 1) <= 0) return;
+      setCart((current) => {
+        const existing = current.find((line) => line.productId === productId);
+        if (existing) {
+          return current.map((line) =>
+            line.productId === productId
+              ? { ...line, quantity: Math.min(line.quantity + 1, product.stockQuantity ?? 25) }
+              : line,
+          );
+        }
+        return [...current, { productId, quantity: 1 }];
+      });
+      setCartOpen(true);
+    },
+    [managedProducts],
+  );
 
   useEffect(() => {
     const match = window.location.pathname.match(/^\/cart\/add\/([^/]+)\/?$/);
@@ -340,8 +375,17 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       removeFromCart(productId);
       return;
     }
+    const product = getProduct(productId);
+    if (!product || product.isAvailable === false || (product.stockQuantity ?? 1) <= 0) {
+      removeFromCart(productId);
+      return;
+    }
     setCart((current) =>
-      current.map((line) => (line.productId === productId ? { ...line, quantity } : line)),
+      current.map((line) =>
+        line.productId === productId
+          ? { ...line, quantity: Math.min(quantity, product.stockQuantity ?? quantity) }
+          : line,
+      ),
     );
   };
 

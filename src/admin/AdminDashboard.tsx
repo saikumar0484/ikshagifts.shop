@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Download,
+  ExternalLink,
   IndianRupee,
   Inbox,
   KeyRound,
@@ -13,16 +14,19 @@ import {
   LogOut,
   Mail,
   MessageCircle,
+  Minus,
   PackageCheck,
   Pencil,
   Plug,
   Plus,
+  QrCode,
   RefreshCw,
   Save,
   Search,
   Settings,
   Smartphone,
   Trash2,
+  Upload,
   Users,
 } from "lucide-react";
 import { categoryLabel, formatPrice, productCategories, ProductCategory } from "@/data/products";
@@ -92,13 +96,17 @@ type Summary = {
     totalCustomers: number;
     totalProducts: number;
     activeProducts: number;
+    hiddenProducts: number;
     lowStockProducts: number;
+    productsWithoutImages: number;
+    unreadMessages: number;
     revenue: number;
     paidRevenue: number;
     pendingOrders: number;
   };
   byStatus: Record<string, number>;
   lowStock: ProductRow[];
+  productsWithoutImages: ProductRow[];
   recentOrders: OrderRow[];
 };
 
@@ -164,6 +172,17 @@ function whatsappLink(phone: string, message: string) {
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 }
 
+function phoneDigits(phone: string) {
+  return phone.replace(/[^\d]/g, "");
+}
+
+function formatPhone(phone: string) {
+  const digits = phoneDigits(phone);
+  if (!digits) return phone || "No phone saved";
+  if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  return `+${digits}`;
+}
+
 function csvCell(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
@@ -208,7 +227,13 @@ export function AdminDashboard() {
   const [integrationDrafts, setIntegrationDrafts] = useState<Record<string, IntegrationDraft>>({});
   const [productDraft, setProductDraft] = useState<ProductRow>(emptyProduct);
   const [productFilter, setProductFilter] = useState<"all" | ProductCategory>("all");
+  const [productStatusFilter, setProductStatusFilter] = useState<
+    "all" | "available" | "hidden" | "low" | "no-image"
+  >("all");
+  const [productSearch, setProductSearch] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
+  const [contactSearch, setContactSearch] = useState("");
   const [statusDraft, setStatusDraft] = useState<Record<string, string>>({});
   const [trackingDraft, setTrackingDraft] = useState<Record<string, string>>({});
   const [deliveryDraft, setDeliveryDraft] = useState<Record<string, string>>({});
@@ -249,6 +274,21 @@ export function AdminDashboard() {
       ),
     );
   };
+
+  const whatsappContacts = useMemo(() => {
+    const query = contactSearch.trim().toLowerCase();
+    return customers
+      .filter((customer) => {
+        if (!phoneDigits(customer.phone)) return false;
+        if (!query) return true;
+        return [customer.name, customer.email, customer.phone].some((value) =>
+          String(value || "")
+            .toLowerCase()
+            .includes(query),
+        );
+      })
+      .sort((a, b) => (b.lastOrderAt || "").localeCompare(a.lastOrderAt || ""));
+  }, [contactSearch, customers]);
 
   useEffect(() => {
     api<{ admin: boolean }>("/api/admin?action=me")
@@ -317,13 +357,21 @@ export function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
-  const filteredProducts = useMemo(
-    () =>
-      productFilter === "all"
-        ? products
-        : products.filter((product) => product.category === productFilter),
-    [productFilter, products],
-  );
+  const filteredProducts = useMemo(() => {
+    const term = productSearch.toLowerCase();
+    return products.filter((product) => {
+      const matchesCategory = productFilter === "all" || product.category === productFilter;
+      const matchesStatus =
+        productStatusFilter === "all" ||
+        (productStatusFilter === "available" && product.is_available) ||
+        (productStatusFilter === "hidden" && !product.is_available) ||
+        (productStatusFilter === "low" && product.is_available && product.stock_quantity <= 3) ||
+        (productStatusFilter === "no-image" && !product.image_url);
+      const searchable =
+        `${product.name} ${product.category} ${product.tag} ${product.description}`.toLowerCase();
+      return matchesCategory && matchesStatus && searchable.includes(term);
+    });
+  }, [productFilter, productSearch, productStatusFilter, products]);
 
   const unreadMessages = useMemo(
     () => messages.filter((message) => !message.is_read).length,
@@ -359,7 +407,7 @@ export function AdminDashboard() {
     setError("");
     try {
       await api("/api/admin?action=products", {
-        method: productDraft.id ? "POST" : "POST",
+        method: products.some((product) => product.id === productDraft.id) ? "PATCH" : "POST",
         body: JSON.stringify(productDraft),
       });
       setProductDraft(emptyProduct);
@@ -382,6 +430,19 @@ export function AdminDashboard() {
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product could not be deleted.");
+    }
+  };
+
+  const updateProductQuick = async (product: ProductRow, patch: Partial<ProductRow>) => {
+    setError("");
+    try {
+      await api("/api/admin?action=products", {
+        method: "PATCH",
+        body: JSON.stringify({ ...product, ...patch }),
+      });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Product could not be updated.");
     }
   };
 
@@ -469,16 +530,33 @@ export function AdminDashboard() {
     }
   };
 
-  const attachProductImage = (file: File | null) => {
+  const attachProductImage = async (file: File | null) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
+    setError("");
+    setImageUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          typeof reader.result === "string"
+            ? resolve(reader.result)
+            : reject(new Error("Image could not be read."));
+        reader.onerror = () => reject(new Error("Image could not be read."));
+        reader.readAsDataURL(file);
+      });
+      const data = await api<{ imageUrl: string }>("/api/admin?action=product-image", {
+        method: "POST",
+        body: JSON.stringify({ name: productDraft.name || file.name, dataUrl }),
+      });
       setProductDraft((current) => ({
         ...current,
-        image_url: typeof reader.result === "string" ? reader.result : current.image_url,
+        image_url: data.imageUrl,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image could not be uploaded.");
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   if (loading) {
@@ -707,7 +785,74 @@ export function AdminDashboard() {
               <StatCard label="Orders" value={summary.metrics.totalOrders} icon={PackageCheck} />
               <StatCard label="Customers" value={summary.metrics.totalCustomers} icon={Users} />
               <StatCard label="Low stock" value={summary.metrics.lowStockProducts} icon={Boxes} />
+              <StatCard
+                label="Active products"
+                value={summary.metrics.activeProducts}
+                icon={PackageCheck}
+              />
+              <StatCard
+                label="Hidden products"
+                value={summary.metrics.hiddenProducts}
+                icon={Boxes}
+              />
+              <StatCard
+                label="Pending orders"
+                value={summary.metrics.pendingOrders}
+                icon={ClipboardList}
+              />
+              <StatCard label="Unread inbox" value={summary.metrics.unreadMessages} icon={Mail} />
             </div>
+            <section className="rounded-2xl border border-border bg-card p-6">
+              <h2 className="font-display text-2xl">Needs attention</h2>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductStatusFilter("low");
+                    setTab("product-list");
+                  }}
+                  className="rounded-xl bg-background px-4 py-3 text-left"
+                >
+                  <p className="text-sm text-muted-foreground">Low stock</p>
+                  <p className="mt-1 font-display text-2xl text-primary">
+                    {summary.lowStock.length}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("orders")}
+                  className="rounded-xl bg-background px-4 py-3 text-left"
+                >
+                  <p className="text-sm text-muted-foreground">New orders</p>
+                  <p className="mt-1 font-display text-2xl text-primary">
+                    {summary.metrics.pendingOrders}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("inbox")}
+                  className="rounded-xl bg-background px-4 py-3 text-left"
+                >
+                  <p className="text-sm text-muted-foreground">Unread messages</p>
+                  <p className="mt-1 font-display text-2xl text-primary">
+                    {summary.metrics.unreadMessages}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductStatusFilter("no-image");
+                    setTab("product-list");
+                  }}
+                  className="rounded-xl bg-background px-4 py-3 text-left"
+                >
+                  <p className="text-sm text-muted-foreground">Missing images</p>
+                  <p className="mt-1 font-display text-2xl text-primary">
+                    {summary.metrics.productsWithoutImages}
+                  </p>
+                </button>
+              </div>
+            </section>
             <div className="grid gap-5 lg:grid-cols-2">
               <section className="rounded-2xl border border-border bg-card p-6">
                 <h2 className="font-display text-2xl">Order pipeline</h2>
@@ -1078,12 +1223,18 @@ export function AdminDashboard() {
                 </label>
                 <label className="text-sm font-medium">
                   Image Upload
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => attachProductImage(event.target.files?.[0] || null)}
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                  />
+                  <span className="mt-1 flex items-center gap-3 rounded-xl border border-input bg-background px-3 py-2 text-sm">
+                    <Upload size={16} className="text-primary" />
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) => attachProductImage(event.target.files?.[0] || null)}
+                      className="w-full text-sm"
+                    />
+                  </span>
+                  {imageUploading && (
+                    <span className="mt-1 block text-xs text-primary">Uploading image...</span>
+                  )}
                 </label>
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="text-sm font-medium">
@@ -1136,19 +1287,34 @@ export function AdminDashboard() {
                     className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
                   />
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={productDraft.is_available}
-                    onChange={(event) =>
-                      setProductDraft((current) => ({
-                        ...current,
-                        is_available: event.target.checked,
-                      }))
-                    }
-                  />
-                  Available in shop
-                </label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={productDraft.is_available}
+                      onChange={(event) =>
+                        setProductDraft((current) => ({
+                          ...current,
+                          is_available: event.target.checked,
+                        }))
+                      }
+                    />
+                    Available in shop
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={productDraft.is_featured}
+                      onChange={(event) =>
+                        setProductDraft((current) => ({
+                          ...current,
+                          is_featured: event.target.checked,
+                        }))
+                      }
+                    />
+                    Featured product
+                  </label>
+                </div>
                 <button className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">
                   <Save size={16} />
                   Save Product
@@ -1190,43 +1356,73 @@ export function AdminDashboard() {
 
         {tab === "product-list" && (
           <section className="space-y-4">
-            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <h2 className="font-display text-2xl">All products</h2>
                 <p className="text-sm text-muted-foreground">
-                  Filter by category before editing, hiding, or deleting products.
+                  Search, filter, edit stock, hide, or delete products from one list.
                 </p>
               </div>
-              <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm">
-                <ListFilter size={16} />
-                <select
-                  value={productFilter}
-                  onChange={(event) =>
-                    setProductFilter(event.target.value as "all" | ProductCategory)
-                  }
-                  className="bg-transparent outline-none"
-                >
-                  <option value="all">All categories</option>
-                  {productCategories.map((category) => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_auto_auto]">
+                <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm">
+                  <Search size={16} />
+                  <input
+                    value={productSearch}
+                    onChange={(event) => setProductSearch(event.target.value)}
+                    placeholder="Search products"
+                    className="w-full bg-transparent outline-none"
+                  />
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm">
+                  <ListFilter size={16} />
+                  <select
+                    value={productFilter}
+                    onChange={(event) =>
+                      setProductFilter(event.target.value as "all" | ProductCategory)
+                    }
+                    className="bg-transparent outline-none"
+                  >
+                    <option value="all">All categories</option>
+                    {productCategories.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm">
+                  <PackageCheck size={16} />
+                  <select
+                    value={productStatusFilter}
+                    onChange={(event) =>
+                      setProductStatusFilter(
+                        event.target.value as "all" | "available" | "hidden" | "low" | "no-image",
+                      )
+                    }
+                    className="bg-transparent outline-none"
+                  >
+                    <option value="all">All status</option>
+                    <option value="available">Available</option>
+                    <option value="hidden">Hidden</option>
+                    <option value="low">Low stock</option>
+                    <option value="no-image">No image</option>
+                  </select>
+                </label>
+              </div>
             </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              <div className="hidden grid-cols-[80px_1.4fr_120px_160px_110px] gap-4 border-b border-border px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground lg:grid">
+              <div className="hidden grid-cols-[80px_1.4fr_120px_150px_160px_110px] gap-4 border-b border-border px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground lg:grid">
                 <span>Image</span>
                 <span>Name</span>
                 <span>Price</span>
                 <span>Category</span>
+                <span>Stock</span>
                 <span>Actions</span>
               </div>
               {filteredProducts.map((product) => (
                 <article
                   key={product.id}
-                  className="grid gap-4 border-b border-border px-5 py-4 last:border-b-0 lg:grid-cols-[80px_1.4fr_120px_160px_110px] lg:items-center"
+                  className="grid gap-4 border-b border-border px-5 py-4 last:border-b-0 lg:grid-cols-[80px_1.4fr_120px_150px_160px_110px] lg:items-center"
                 >
                   <div className="h-20 w-20 overflow-hidden rounded-xl bg-background">
                     {product.image_url ? (
@@ -1250,6 +1446,52 @@ export function AdminDashboard() {
                   </div>
                   <p className="font-semibold text-primary">{formatPrice(product.price)}</p>
                   <p className="text-sm text-muted-foreground">{categoryLabel(product.category)}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateProductQuick(product, {
+                          stock_quantity: Math.max(0, product.stock_quantity - 1),
+                        })
+                      }
+                      className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-primary"
+                      title="Decrease stock"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <input
+                      value={product.stock_quantity}
+                      type="number"
+                      min={0}
+                      onChange={(event) =>
+                        updateProductQuick(product, {
+                          stock_quantity: Math.max(0, Number(event.target.value) || 0),
+                        })
+                      }
+                      className="h-8 w-16 rounded-lg border border-input bg-background px-2 text-center text-sm outline-none focus:border-primary"
+                      aria-label={`${product.name} stock quantity`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateProductQuick(product, { stock_quantity: product.stock_quantity + 1 })
+                      }
+                      className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-primary"
+                      title="Increase stock"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <label className="ml-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={product.is_available}
+                        onChange={(event) =>
+                          updateProductQuick(product, { is_available: event.target.checked })
+                        }
+                      />
+                      Show
+                    </label>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -1521,6 +1763,51 @@ export function AdminDashboard() {
                             />
                           </label>
                         </div>
+                        <div className="rounded-2xl border border-border bg-background p-4">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex gap-3">
+                              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-dashed border-primary/40 bg-card text-primary">
+                                <QrCode size={38} />
+                              </div>
+                              <div>
+                                <h3 className="font-display text-xl">WhatsApp Web QR login</h3>
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                  Open the official WhatsApp Web screen, scan the QR from your
+                                  phone, then manage customer chats from the same browser session.
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                  For safety, this dashboard does not store your WhatsApp session or
+                                  automate WhatsApp Web. Customer contacts below open as chat links.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <a
+                                href="https://web.whatsapp.com/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-4 py-2 text-sm font-semibold text-white"
+                              >
+                                <ExternalLink size={16} />
+                                Open QR Login
+                              </a>
+                              {phoneDigits(draft.publicConfig.businessPhone || "") ? (
+                                <a
+                                  href={whatsappLink(
+                                    draft.publicConfig.businessPhone || "",
+                                    "Testing iksha gifts WhatsApp integration.",
+                                  )}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-primary"
+                                >
+                                  <MessageCircle size={16} />
+                                  Test chat
+                                </a>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -1542,6 +1829,88 @@ export function AdminDashboard() {
                 </article>
               );
             })}
+            <article className="rounded-2xl border border-border bg-card p-6 xl:col-span-2">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-primary">
+                    WhatsApp contacts
+                  </p>
+                  <h2 className="font-display text-2xl">Customer chat manager</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Use this after logging into WhatsApp Web. Each contact opens a prefilled
+                    customer chat in the official WhatsApp session.
+                  </p>
+                </div>
+                <a
+                  href="https://web.whatsapp.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-4 py-2 text-sm font-semibold text-white"
+                >
+                  <ExternalLink size={16} />
+                  Open WhatsApp Web
+                </a>
+              </div>
+
+              <label className="mt-5 flex items-center gap-2 rounded-full border border-input bg-background px-4 py-2 text-sm">
+                <Search size={16} className="text-primary" />
+                <input
+                  value={contactSearch}
+                  onChange={(event) => setContactSearch(event.target.value)}
+                  placeholder="Search customers by name, email, or phone"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                />
+              </label>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {whatsappContacts.slice(0, 12).map((customer) => (
+                  <div
+                    key={customer.id}
+                    className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4"
+                  >
+                    <div>
+                      <h3 className="font-display text-lg">{customer.name}</h3>
+                      <p className="text-sm text-muted-foreground">{formatPhone(customer.phone)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {customer.orderCount || 0} orders -{" "}
+                        {formatPrice(customer.lifetimeValue || 0)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={whatsappLink(
+                          customer.phone,
+                          `Hi ${customer.name}, this is iksha gifts. How can we help you today?`,
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f7a4d] px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        <MessageCircle size={14} />
+                        Chat
+                      </a>
+                      <a
+                        href={whatsappLink(
+                          customer.phone,
+                          `Hi ${customer.name}, thank you for shopping with iksha gifts. We are checking your order update now.`,
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-primary"
+                      >
+                        Order update
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!whatsappContacts.length ? (
+                <div className="mt-5 rounded-2xl border border-dashed border-border bg-background p-6 text-sm text-muted-foreground">
+                  No customer phone contacts match this search yet.
+                </div>
+              ) : null}
+            </article>
           </section>
         )}
 

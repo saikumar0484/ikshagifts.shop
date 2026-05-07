@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { db } from "./db.js";
 
 export type CatalogItem = {
@@ -15,6 +16,8 @@ export type CatalogItem = {
   delivery?: string;
   stockQuantity?: number;
   isAvailable?: boolean;
+  isFeatured?: boolean;
+  sortOrder?: number;
 };
 
 export const productCategories = [
@@ -225,6 +228,19 @@ export type ProductRow = {
   updated_at?: string;
 };
 
+export async function bumpCatalogVersion(reason = "products") {
+  await db.upsert(
+    "catalog_versions",
+    {
+      key: "products",
+      reason,
+      version: randomUUID(),
+      updated_at: new Date().toISOString(),
+    },
+    "key",
+  );
+}
+
 export function normalizeProduct(row: ProductRow): CatalogItem {
   return {
     id: row.id,
@@ -241,6 +257,8 @@ export function normalizeProduct(row: ProductRow): CatalogItem {
     delivery: row.delivery,
     stockQuantity: Number(row.stock_quantity) || 0,
     isAvailable: row.is_available,
+    isFeatured: row.is_featured,
+    sortOrder: row.sort_order,
   };
 }
 
@@ -291,4 +309,35 @@ export async function priceCart(items: CartLine[]) {
     lines,
     total: lines.reduce((sum, line) => sum + line.lineTotal, 0),
   };
+}
+
+export async function deductProductStock(lines: Array<{ productId: string; quantity: number }>) {
+  const rows = await db.list<ProductRow>("products");
+  const byId = new Map(rows.map((product) => [product.id, product]));
+
+  for (const line of lines) {
+    const product = byId.get(line.productId);
+    const quantity = Math.max(1, Math.round(Number(line.quantity) || 1));
+    if (!product) throw new Error(`Unknown product: ${line.productId}`);
+    if (!product.is_available) throw new Error(`${product.name} is currently unavailable.`);
+    if (quantity > product.stock_quantity) {
+      throw new Error(`Only ${product.stock_quantity} ${product.name} left in stock.`);
+    }
+  }
+
+  for (const line of lines) {
+    const product = byId.get(line.productId);
+    if (!product) continue;
+    const quantity = Math.max(1, Math.round(Number(line.quantity) || 1));
+    await db.update<ProductRow>(
+      "products",
+      { id: product.id },
+      {
+        stock_quantity: Math.max(0, Number(product.stock_quantity) - quantity),
+        updated_at: new Date().toISOString(),
+      },
+    );
+  }
+
+  await bumpCatalogVersion("stock-deducted");
 }

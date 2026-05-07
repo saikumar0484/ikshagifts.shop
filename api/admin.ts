@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { randomUUID } from "node:crypto";
 import {
   requireAdmin,
   setAdminSession,
@@ -10,8 +11,13 @@ import {
   getPrimaryAdminUser,
   markAdminLogin,
 } from "./_lib/admin.js";
-import { categoryLabel, isProductCategory, ProductRow } from "./_lib/catalog.js";
-import { db } from "./_lib/db.js";
+import {
+  bumpCatalogVersion,
+  categoryLabel,
+  isProductCategory,
+  ProductRow,
+} from "./_lib/catalog.js";
+import { db, uploadStorageObject } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
 import { listIntegrations, saveIntegration } from "./_lib/integrations.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "./_lib/security.js";
@@ -49,6 +55,13 @@ type InboxMessageRow = {
   created_at: string;
 };
 
+const imageTypes: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 const labels: Record<string, string> = {
   order_placed: "Order placed",
   confirmed: "Order confirmed",
@@ -84,6 +97,7 @@ function productBody(body: any) {
   if (!isProductCategory(category)) {
     throw new Error("Choose Women, Men, or Customized Gifts for the product category.");
   }
+  const isAvailable = body.isAvailable ?? body.is_available;
   return {
     id,
     name,
@@ -99,11 +113,32 @@ function productBody(body: any) {
     rating: Math.max(0, Math.min(Number(body.rating) || 4.8, 5)),
     delivery: safeString(body.delivery || "Ships in 4-6 days", 80),
     stock_quantity: Math.max(0, Math.round(Number(body.stockQuantity ?? body.stock_quantity ?? 0))),
-    is_available: Boolean(body.isAvailable ?? body.is_available),
+    is_available: isAvailable === undefined ? true : Boolean(isAvailable),
     is_featured: Boolean(body.isFeatured ?? body.is_featured),
     sort_order: Math.round(Number(body.sortOrder ?? body.sort_order ?? 100)),
     updated_at: new Date().toISOString(),
   };
+}
+
+async function productImageBody(body: any) {
+  const dataUrl = String(body.dataUrl || body.data_url || "");
+  const match = dataUrl.match(/^data:(image\/(?:jpe?g|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error("Upload a JPG, PNG, or WEBP image.");
+  const mimeType = match[1].toLowerCase();
+  const extension = imageTypes[mimeType];
+  if (!extension) throw new Error("Upload a JPG, PNG, or WEBP image.");
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length) throw new Error("Image file is empty.");
+  if (bytes.byteLength > 5 * 1024 * 1024) throw new Error("Image must be 5 MB or smaller.");
+
+  const name = slugify(safeString(body.name || "product-image", 120)) || "product-image";
+  const imageUrl = await uploadStorageObject(
+    "product-images",
+    `${name}-${randomUUID()}.${extension}`,
+    bytes,
+    mimeType === "image/jpg" ? "image/jpeg" : mimeType,
+  );
+  return { imageUrl };
 }
 
 function inLastDays(date: string, days: number) {
@@ -167,10 +202,11 @@ export default async function handler(req: any, res: any) {
 
     if (action === "summary") {
       if (!method(req, res, ["GET"])) return;
-      const [orders, customers, products] = await Promise.all([
+      const [orders, customers, products, messages] = await Promise.all([
         db.list<OrderRow>("orders", { order: "created_at.desc" }),
         db.list<CustomerRow>("customers", { order: "created_at.desc" }),
         db.list<ProductRow>("products", { order: "sort_order.asc,name.asc" }),
+        db.list<InboxMessageRow>("inbox_messages", { order: "created_at.desc" }).catch(() => []),
       ]);
       const revenue = orders.reduce((sum, order) => sum + Number(order.amount || 0), 0);
       const paidRevenue = orders
@@ -179,6 +215,7 @@ export default async function handler(req: any, res: any) {
       const lowStock = products.filter(
         (product) => product.is_available && product.stock_quantity <= 3,
       );
+      const productsWithoutImages = products.filter((product) => !product.image_url);
       const byStatus = orders.reduce<Record<string, number>>((acc, order) => {
         acc[order.status] = (acc[order.status] || 0) + 1;
         return acc;
@@ -190,7 +227,10 @@ export default async function handler(req: any, res: any) {
           totalCustomers: customers.length,
           totalProducts: products.length,
           activeProducts: products.filter((product) => product.is_available).length,
+          hiddenProducts: products.filter((product) => !product.is_available).length,
           lowStockProducts: lowStock.length,
+          productsWithoutImages: productsWithoutImages.length,
+          unreadMessages: messages.filter((message) => !message.is_read).length,
           revenue,
           paidRevenue,
           pendingOrders: orders.filter(
@@ -200,6 +240,7 @@ export default async function handler(req: any, res: any) {
         byStatus,
         recentOrders: orders.slice(0, 8),
         lowStock,
+        productsWithoutImages,
       });
       return;
     }
@@ -236,6 +277,7 @@ export default async function handler(req: any, res: any) {
         const id = safeString(body.id, 100);
         if (!id) throw new Error("Product id is required.");
         await db.delete("products", { id });
+        await bumpCatalogVersion("product-deleted");
         json(res, 200, { ok: true });
         return;
       }
@@ -248,7 +290,17 @@ export default async function handler(req: any, res: any) {
               "id",
             )
           : await db.update<ProductRow>("products", { id: payload.id }, payload);
+      await bumpCatalogVersion(req.method === "POST" ? "product-saved" : "product-updated");
       json(res, 200, { product });
+      return;
+    }
+
+    if (action === "product-image") {
+      if (!method(req, res, ["POST"])) return;
+      assertSameOrigin(req);
+      requireJson(req);
+      await rateLimit(req, res, "admin:product-image", 20, 15 * 60);
+      json(res, 200, await productImageBody(await readBody(req, 7 * 1024 * 1024)));
       return;
     }
 

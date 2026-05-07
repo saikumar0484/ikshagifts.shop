@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { priceCart } from "../_lib/catalog.js";
+import { deductProductStock, priceCart } from "../_lib/catalog.js";
 import { db } from "../_lib/db.js";
 import { json, method, readBody } from "../_lib/http.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "../_lib/security.js";
@@ -170,12 +170,13 @@ async function handleVerifyPayment(body: any, res: any) {
   const razorpayOrderId = String(body.razorpayOrderId || "");
   const paymentId = String(body.paymentId || "");
   const signature = String(body.signature || "");
-  const order = await db.selectOne<{ razorpay_order_id: string; payment_status: string }>(
-    "orders",
-    {
-      id: appOrderId,
-    },
-  );
+  const order = await db.selectOne<{
+    razorpay_order_id: string;
+    payment_status: string;
+    items: Array<{ productId: string; quantity: number }>;
+  }>("orders", {
+    id: appOrderId,
+  });
   if (!order || order.razorpay_order_id !== razorpayOrderId) {
     throw new Error("Order not found.");
   }
@@ -199,6 +200,7 @@ async function handleVerifyPayment(body: any, res: any) {
     throw new Error("Payment signature verification failed.");
   }
 
+  await deductProductStock(order.items || []);
   await db.update(
     "orders",
     { id: appOrderId },

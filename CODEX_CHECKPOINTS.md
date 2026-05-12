@@ -5,7 +5,7 @@ Use this file as the handoff source of truth when continuing this project from a
 Project path:
 
 ```powershell
-C:\Users\Admin\Documents\New project 2\ikshagifts.shop-main
+C:\Users\208X1\Documents\New project\iksha-gifts-supabase-commerce
 ```
 
 ## Checkpoint 1 - Admin Product And Inbox Work
@@ -1793,6 +1793,91 @@ Result:
 
 - Build passed.
 - Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 41 - May 12 Go-Live Handoff Applied With Razorpay Frozen
+
+Status: Applied, pushed, migrated, and deployed to production.
+
+Date: 2026-05-12
+
+Goal:
+
+- Apply the owner-provided go-live handoff zip to the live `ikshagifts.shop` repo.
+- Preserve the existing working Razorpay implementation exactly where payment behavior matters.
+- Push the result to GitHub and deploy the live production domain.
+
+Source archive:
+
+```text
+C:\Users\208X1\Downloads\ikshagifts-shop-go-live-handoff-20260512-110100.zip
+```
+
+What changed:
+
+- Imported account dashboard and `/account` route support.
+- Imported Supabase email OTP UI/API changes and retry handling.
+- Imported optimized/local product images and image optimization helpers.
+- Imported Best Seller category support for product filtering/admin usage.
+- Imported admin/email/customer communication improvements that do not affect Razorpay behavior.
+- Added `@supabase/supabase-js`.
+- Removed tracked private handoff file `PRIVATE_SECRET_HANDOFF_README.md`.
+- Updated `vercel.json` only for `/account` rewrites while preserving the Razorpay CSP rules.
+
+Razorpay freeze:
+
+- `api/payments/verify.ts` was not copied from the zip and remains untouched.
+- The current live `loadRazorpayCheckout`, online payment branch, payment signature verification, and checkout success behavior were preserved.
+- Live CSP still allows `https://checkout.razorpay.com` and `https://*.razorpay.com` for Razorpay checkout.
+
+Supabase:
+
+- Planned project `itrpsxjdtvfqhgacozsm` was not accessible from this account.
+- Live API usage matched project `vnqgmwvsbnaxsrxvwybb` (`iksha-gifts-commerce`), so the migration was applied there.
+- Migration: `go_live_account_best_seller_images`
+- Verified after migration:
+  - `public.users` exists.
+  - product category support includes `best_seller`.
+  - placeholder product image count is `0`.
+  - local product image rows were seeded.
+
+Verification:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js .
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- ESLint passed with 8 existing Fast Refresh warnings only.
+- Vite build passed.
+- `git diff --check` passed with line-ending warnings only.
+
+Git and deployment:
+
+```text
+d06ff71 Apply go-live handoff without Razorpay changes
+```
+
+- Pushed to GitHub `main`.
+- Production deployment: `https://iksha-gifts-supabase-commerce-5bs0hqzex.vercel.app`
+- Live alias: `https://ikshagifts.shop`
+
+Live checks:
+
+- `https://ikshagifts.shop` returned HTTP 200.
+- `https://ikshagifts.shop/account` returned HTTP 200.
+- `https://admin.ikshagifts.shop/admin` returned HTTP 200.
+- `https://ikshagifts.shop/api/products` returned 20 products.
+- Product API had `0` `via.placeholder.com` URLs.
+- CSP header still includes Razorpay domains.
+
+Residual notes:
+
+- Supabase security advisors still report existing RLS/no-policy and function search-path warnings. These were not changed as part of the handoff import because the requested scope was go-live import while preserving payment behavior.
+- Some older products may still use inline SVG fallback images, but the broken external placeholder URLs are gone.
 
 ## Checkpoint 40 - Faster Smooth Product Image Loading
 

@@ -13,6 +13,53 @@ The goal of this README is not marketing. It is a working handoff so another Cod
 - Latest preview deployment for the visual-first hero refinement: `https://iksha-gifts-supabase-commerce-mwltmxaup.vercel.app`
 - Latest protected preview for Admin Control Center work: `https://iksha-gifts-supabase-commerce-4bwnsg42y.vercel.app`
 
+## 2026-05-12 Go-Live Handoff Import
+
+Applied the owner-provided handoff archive:
+
+```text
+C:\Users\208X1\Downloads\ikshagifts-shop-go-live-handoff-20260512-110100.zip
+```
+
+Imported the non-payment updates into the live repo and deployed them to production:
+
+- Git commit: `d06ff71 Apply go-live handoff without Razorpay changes`
+- Production deployment: `https://iksha-gifts-supabase-commerce-5bs0hqzex.vercel.app`
+- Live domain alias: `https://ikshagifts.shop`
+- GitHub remote: `https://github.com/saikumar0484/ikshagifts.shop`
+
+Razorpay freeze note:
+
+- `api/payments/verify.ts` was intentionally not copied from the zip.
+- The existing working Razorpay checkout/signature verification flow in `src/lib/commerce.tsx` was preserved.
+- `vercel.json` kept the current Razorpay CSP allow-list and only merged the `/account` rewrite support.
+
+Database note:
+
+- The plan referenced Supabase project `itrpsxjdtvfqhgacozsm`, but that project was not accessible from this connected account and did not match the live product API.
+- The live storefront is using Supabase project `vnqgmwvsbnaxsrxvwybb` (`iksha-gifts-commerce`), so the controlled migration was applied there.
+- Migration name: `go_live_account_best_seller_images`
+- Migration covered `public.users`, `best_seller` category support, and local product image URL updates for old placeholder/data image rows.
+
+Verification completed:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\eslint\bin\eslint.js .
+node .\node_modules\vite\bin\vite.js build
+```
+
+Result:
+
+- TypeScript passed.
+- ESLint passed with existing Fast Refresh warnings only.
+- Vite production build passed.
+- `https://ikshagifts.shop` returned HTTP 200.
+- `https://ikshagifts.shop/account` returned HTTP 200.
+- `https://admin.ikshagifts.shop/admin` returned HTTP 200.
+- `https://ikshagifts.shop/api/products` returned products with zero `via.placeholder.com` URLs.
+- Live CSP still includes `https://*.razorpay.com` for Razorpay checkout.
+
 ## What this project is
 
 This is a Vite + React + TypeScript ecommerce-style site for a handmade crochet brand.

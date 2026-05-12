@@ -1,5 +1,5 @@
 export type ProductCollection = "women" | "men" | "custom";
-export type ProductCategory = "women" | "men" | "customized_gifts";
+export type ProductCategory = "women" | "men" | "customized_gifts" | "best_seller";
 
 export const productCategories: Array<{
   value: ProductCategory;
@@ -9,12 +9,14 @@ export const productCategories: Array<{
   { value: "women", label: "Women", collection: "women" },
   { value: "men", label: "Men", collection: "men" },
   { value: "customized_gifts", label: "Customized Gifts", collection: "custom" },
+  { value: "best_seller", label: "Best Seller", collection: "custom" },
 ];
 
 export const categoryToCollection: Record<ProductCategory, ProductCollection> = {
   women: "women",
   men: "men",
   customized_gifts: "custom",
+  best_seller: "custom",
 };
 
 export const collectionToCategory: Record<ProductCollection, ProductCategory> = {
@@ -46,6 +48,9 @@ export type Product = {
   desc: string;
   image: string;
   imageUrl?: string;
+  image2?: string;
+  image2Url?: string;
+  images?: string[];
   cartUrl: string;
   price: number;
   oldPrice?: number;
@@ -67,7 +72,7 @@ export const products: Product[] = [
     collection: "women",
     tag: "New",
     desc: "A trendy bracelet designed to elevate your everyday look with elegance and charm.",
-    image: placeholderImage("Bracelet"),
+    image: "/product-images/bracelet.jpg",
     cartUrl: "/cart/add/bracelet",
     price: 5000,
     oldPrice: 6000,
@@ -85,7 +90,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Couple",
     desc: "A perfect matching watch set for couples, symbolizing love and timeless bonding.",
-    image: placeholderImage("Couple Watches"),
+    image: "/product-images/couple-watches.jpg",
     cartUrl: "/cart/add/couple-watches",
     price: 5000,
     oldPrice: 6000,
@@ -103,7 +108,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Couple",
     desc: "Beautiful matching bracelets crafted for couples to celebrate their connection.",
-    image: placeholderImage("Couple Bracelets"),
+    image: "/product-images/couple-bracelets.jpg",
     cartUrl: "/cart/add/couple-bracelets",
     price: 5000,
     oldPrice: 6000,
@@ -121,7 +126,7 @@ export const products: Product[] = [
     collection: "women",
     tag: "Elegant",
     desc: "A stylish and modern watch designed for women who love sophistication.",
-    image: placeholderImage("Women Watch"),
+    image: "/product-images/women-watch.jpg",
     cartUrl: "/cart/add/women-watch",
     price: 5000,
     oldPrice: 6000,
@@ -139,7 +144,7 @@ export const products: Product[] = [
     collection: "men",
     tag: "Classic",
     desc: "A bold and classy watch built for men who appreciate timeless fashion.",
-    image: placeholderImage("Men Watch"),
+    image: "/product-images/men-watch.jpg",
     cartUrl: "/cart/add/men-watch",
     price: 5000,
     oldPrice: 6000,
@@ -157,7 +162,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Bouquet",
     desc: "A cute bouquet arrangement perfect for small surprises and sweet moments.",
-    image: placeholderImage("Small Bouquet"),
+    image: "/product-images/small-bouquet.jpg",
     cartUrl: "/cart/add/small-bouquet",
     price: 5000,
     oldPrice: 6000,
@@ -175,7 +180,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Bouquet",
     desc: "A luxurious bouquet designed to make every occasion extra special.",
-    image: placeholderImage("Large Bouquet"),
+    image: "/product-images/large-bouquet.jpg",
     cartUrl: "/cart/add/large-bouquet",
     price: 5000,
     oldPrice: 6000,
@@ -193,7 +198,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Hamper",
     desc: "A compact hamper filled with delightful surprises for your loved ones.",
-    image: placeholderImage("Small Hamper"),
+    image: "/product-images/small-hamper.jpg",
     cartUrl: "/cart/add/small-hamper",
     price: 5000,
     oldPrice: 6000,
@@ -211,7 +216,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Hamper",
     desc: "A premium hamper packed with exclusive gifts to impress and delight.",
-    image: placeholderImage("Large Hamper"),
+    image: "/product-images/large-hamper.jpg",
     cartUrl: "/cart/add/large-hamper",
     price: 5000,
     oldPrice: 6000,
@@ -229,7 +234,7 @@ export const products: Product[] = [
     collection: "custom",
     tag: "Custom",
     desc: "A unique magazine-style gift designed to capture memories creatively.",
-    image: placeholderImage("Magazine Gift"),
+    image: "/product-images/magazine-gift.jpg",
     cartUrl: "/cart/add/magazine-gift",
     price: 5000,
     oldPrice: 6000,
@@ -247,7 +252,7 @@ export const products: Product[] = [
     collection: "women",
     tag: "Couple",
     desc: "A stylish bracelet specially crafted for women in a couple set.",
-    image: placeholderImage("Women Bracelet"),
+    image: "/product-images/women-couple-bracelet.jpg",
     cartUrl: "/cart/add/women-couple-bracelet",
     price: 5000,
     oldPrice: 6000,
@@ -265,7 +270,7 @@ export const products: Product[] = [
     collection: "men",
     tag: "Couple",
     desc: "A bold and elegant bracelet designed for men in a couple set.",
-    image: placeholderImage("Men Bracelet"),
+    image: "/product-images/men-couple-bracelet.jpg",
     cartUrl: "/cart/add/men-couple-bracelet",
     price: 5000,
     oldPrice: 6000,
@@ -283,7 +288,7 @@ export const products: Product[] = [
     collection: "women",
     tag: "Couple",
     desc: "A beautifully designed watch set perfect for couples who love matching styles.",
-    image: placeholderImage("Women Couple Watches"),
+    image: "/product-images/women-couple-watches.jpg",
     cartUrl: "/cart/add/women-couple-watches",
     price: 5000,
     oldPrice: 6000,

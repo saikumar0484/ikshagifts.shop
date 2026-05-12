@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { AccountDashboard } from "@/components/site/AccountDashboard";
 import { AuthModal } from "@/components/site/AuthModal";
 import { CartDrawer } from "@/components/site/CartDrawer";
 import { DeferredSection } from "@/components/site/DeferredSection";
@@ -27,11 +28,19 @@ const Footer = lazy(() =>
 );
 
 export function App() {
+  const [path, setPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const updatePath = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", updatePath);
+    return () => window.removeEventListener("popstate", updatePath);
+  }, []);
+
   const isAdminHost = window.location.hostname.startsWith("admin.");
-  const collectionMatch = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
+  const collectionMatch = path.match(/^\/collections\/(women|men|custom)/);
   const activeCollection = (collectionMatch?.[1] as "women" | "men" | "custom" | undefined) || null;
 
-  if (isAdminHost || window.location.pathname.startsWith("/admin")) {
+  if (isAdminHost || path.startsWith("/admin")) {
     return (
       <Suspense
         fallback={
@@ -49,25 +58,31 @@ export function App() {
     <CommerceProvider>
       <main className="min-h-screen bg-background">
         <Nav />
-        {!activeCollection && <Hero />}
-        <Shop collectionSlug={activeCollection} />
-        {!activeCollection && (
+        {path.startsWith("/account") ? (
+          <AccountDashboard />
+        ) : (
           <>
-            <SocialProof />
-            <GiftExperience />
+            {!activeCollection && <Hero />}
+            <Shop collectionSlug={activeCollection} />
+            {!activeCollection && (
+              <>
+                <SocialProof />
+                <GiftExperience />
+              </>
+            )}
+            <DeferredSection id="contact" minHeight={720}>
+              <Suspense fallback={null}>
+                <Contact />
+              </Suspense>
+            </DeferredSection>
+            <Suspense fallback={null}>
+              <LegalPolicies />
+            </Suspense>
+            <Suspense fallback={null}>
+              <Footer />
+            </Suspense>
           </>
         )}
-        <DeferredSection id="contact" minHeight={720}>
-          <Suspense fallback={null}>
-            <Contact />
-          </Suspense>
-        </DeferredSection>
-        <Suspense fallback={null}>
-          <LegalPolicies />
-        </Suspense>
-        <Suspense fallback={null}>
-          <Footer />
-        </Suspense>
       </main>
       <WhatsAppFloat />
       <CartDrawer />

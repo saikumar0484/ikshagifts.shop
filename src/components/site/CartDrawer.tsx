@@ -2,9 +2,11 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { formatPrice } from "@/data/products";
 import { CheckoutDetails, useCommerce } from "@/lib/commerce";
+import { optimizedProductImage, optimizedProductImageSrcSet } from "@/lib/imageOptimization";
 
 const validCouponCode = "IKSHA150";
 const couponDiscountAmount = 150;
+const couponMinimumCartValue = 299;
 
 export function CartDrawer() {
   const [couponInput, setCouponInput] = useState("");
@@ -31,7 +33,7 @@ export function CartDrawer() {
   } = useCommerce();
 
   const cartDiscount = useMemo(() => {
-    if (appliedCoupon !== validCouponCode || cartTotal <= 0) return 0;
+    if (appliedCoupon !== validCouponCode || cartTotal < couponMinimumCartValue) return 0;
     return Math.min(couponDiscountAmount, cartTotal);
   }, [appliedCoupon, cartTotal]);
 
@@ -43,8 +45,11 @@ export function CartDrawer() {
       setAppliedCoupon("");
       setCouponMessage("");
       setShowCheckoutForm(false);
+    } else if (appliedCoupon && cartTotal < couponMinimumCartValue) {
+      setAppliedCoupon("");
+      setCouponMessage(`Add minimum ${formatPrice(couponMinimumCartValue)} to apply coupon.`);
     }
-  }, [cart.length]);
+  }, [appliedCoupon, cart.length, cartTotal]);
 
   const updateDetails = (field: keyof CheckoutDetails, value: string) => {
     setDetails((current) => ({ ...current, [field]: value }));
@@ -60,6 +65,11 @@ export function CartDrawer() {
     }
     if (normalized !== validCouponCode) {
       setCouponMessage("Invalid coupon code.");
+      setAppliedCoupon("");
+      return;
+    }
+    if (cartTotal < couponMinimumCartValue) {
+      setCouponMessage(`Add minimum ${formatPrice(couponMinimumCartValue)} to apply coupon.`);
       setAppliedCoupon("");
       return;
     }
@@ -126,8 +136,12 @@ export function CartDrawer() {
                     className="grid grid-cols-[84px_1fr] gap-4 rounded-3xl bg-background p-3"
                   >
                     <img
-                      src={product.image}
+                      src={optimizedProductImage(product.image, 320)}
+                      srcSet={optimizedProductImageSrcSet(product.image)}
+                      sizes="84px"
                       alt={product.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-24 w-[84px] rounded-2xl object-cover"
                       width={168}
                       height={192}
@@ -238,6 +252,9 @@ export function CartDrawer() {
                     {couponMessage}
                   </p>
                 )}
+                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                  Minimum cart value {formatPrice(couponMinimumCartValue)} required to apply code.
+                </p>
               </form>
               {cartDiscount > 0 && (
                 <div className="mt-4 flex items-center justify-between">

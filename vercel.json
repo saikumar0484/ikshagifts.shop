@@ -9,6 +9,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/account/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/account",
+      "destination": "/index.html"
+    },
+    {
       "source": "/cart/add/:path*",
       "destination": "/index.html"
     }

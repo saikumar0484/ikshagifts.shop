@@ -97,29 +97,86 @@ function htmlEscape(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-async function sendSmtpOtp(email: string, otp: string, name = "there") {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const fromEmail = process.env.SMTP_FROM || user;
+type EmailConfig = {
+  enabled: boolean;
+  provider: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  resendApiKey: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+};
+
+async function emailConfig(): Promise<EmailConfig> {
+  const integrations = await listIntegrations().catch(() => []);
+  const emailIntegration = integrations.find((item) => item.key === "email");
+  const emailSecrets: Record<string, string> = await getIntegrationSecrets("email").catch(
+    () => ({}),
+  );
+  const publicConfig = (emailIntegration?.publicConfig || {}) as Record<string, string>;
+  const provider = process.env.EMAIL_PROVIDER || emailIntegration?.provider || "resend";
+  const fromName = process.env.SMTP_FROM_NAME || publicConfig.fromName || "iksha gifts";
+  const smtpUser = process.env.SMTP_USER || emailSecrets.smtpUser || "";
+  const fromEmail =
+    process.env.SMTP_FROM || process.env.OTP_EMAIL_FROM || publicConfig.fromEmail || smtpUser;
+
+  return {
+    enabled: Boolean(emailIntegration?.enabled) || Boolean(process.env.RESEND_API_KEY || smtpUser),
+    provider,
+    fromName,
+    fromEmail,
+    replyTo: process.env.SMTP_REPLY_TO || publicConfig.replyTo || fromEmail,
+    resendApiKey: process.env.RESEND_API_KEY || emailSecrets.resendApiKey || "",
+    smtpHost: process.env.SMTP_HOST || publicConfig.smtpHost || "",
+    smtpPort: Number(process.env.SMTP_PORT || publicConfig.smtpPort || 465),
+    smtpSecure: String(process.env.SMTP_SECURE ?? publicConfig.smtpSecure ?? "true") !== "false",
+    smtpUser: smtpUser || fromEmail,
+    smtpPass: process.env.SMTP_PASS || emailSecrets.smtpPass || "",
+  };
+}
+
+async function sendSmtpEmail(input: {
+  config: EmailConfig;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}) {
+  const { config } = input;
+  const host = config.smtpHost;
+  const user = config.smtpUser;
+  const pass = config.smtpPass;
+  const fromEmail = config.fromEmail || user;
 
   if (!host || !user || !pass || !fromEmail) return false;
 
-  const port = Number(process.env.SMTP_PORT || 465);
-  const secure = String(process.env.SMTP_SECURE ?? "true").toLowerCase() !== "false";
-  const fromName = process.env.SMTP_FROM_NAME || process.env.OTP_EMAIL_FROM_NAME || "iksha gifts";
-  const safeName = htmlEscape(name);
-  const safeOtp = htmlEscape(otp);
-
   const transporter = nodemailer.createTransport({
     host,
-    port,
-    secure,
+    port: config.smtpPort,
+    secure: config.smtpSecure,
     auth: { user, pass },
   });
 
   await transporter.sendMail({
-    from: `"${fromName.replaceAll('"', "")}" <${fromEmail}>`,
+    from: `"${config.fromName.replaceAll('"', "")}" <${fromEmail}>`,
+    to: input.to,
+    replyTo: config.replyTo || undefined,
+    subject: input.subject,
+    text: input.text,
+    html: input.html,
+  });
+  return true;
+}
+
+async function sendSmtpOtp(config: EmailConfig, email: string, otp: string, name = "there") {
+  const safeName = htmlEscape(name);
+  const safeOtp = htmlEscape(otp);
+  return sendSmtpEmail({
+    config,
     to: email,
     subject: "Welcome to iksha gifts - verify your account",
     text: `Welcome to iksha gifts, ${name}. Your OTP is ${otp}. This code expires in 10 minutes.`,
@@ -132,29 +189,61 @@ async function sendSmtpOtp(email: string, otp: string, name = "there") {
       </div>
     `,
   });
+}
+
+export async function sendStoreEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}) {
+  const config = await emailConfig();
+  if (!config.enabled) return false;
+
+  const sentBySmtp = await sendSmtpEmail({ config, ...input });
+  if (sentBySmtp) return true;
+
+  if (!config.resendApiKey) return false;
+  const fromEmail = config.fromEmail || "onboarding@resend.dev";
+  const from = fromEmail.includes("<") ? fromEmail : `${config.fromName} <${fromEmail}>`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.to],
+      reply_to: config.replyTo || undefined,
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+    }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Store email could not be sent.");
+  }
   return true;
 }
 
-export async function sendEmailOtp(email: string, otp: string) {
-  const sentBySmtp = await sendSmtpOtp(email, otp);
+export async function sendEmailOtp(email: string, otp: string, name = "there") {
+  const config = await emailConfig();
+  if (!config.enabled) {
+    throw new Error("Email is disabled. Enable Email in Admin > Integrations.");
+  }
+
+  const sentBySmtp = await sendSmtpOtp(config, email, otp, name);
   if (sentBySmtp) return;
 
-  const integrations = await listIntegrations().catch(() => []);
-  const emailIntegration = integrations.find((item) => item.key === "email");
-  const emailSecrets: Record<string, string> = await getIntegrationSecrets("email").catch(
-    () => ({}),
-  );
-  const apiKey = process.env.RESEND_API_KEY || emailSecrets.resendApiKey;
-  const fromName = String(emailIntegration?.publicConfig.fromName || "iksha gifts");
-  const fromEmail = String(
-    process.env.OTP_EMAIL_FROM ||
-      emailIntegration?.publicConfig.fromEmail ||
-      "onboarding@resend.dev",
-  );
+  const apiKey = config.resendApiKey;
+  const fromName = config.fromName;
+  const fromEmail = config.fromEmail || "onboarding@resend.dev";
   const from = fromEmail.includes("<") ? fromEmail : `${fromName} <${fromEmail}>`;
   if (!apiKey) {
     throw new Error(
-      "Email OTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM for your personal mailbox.",
+      `Email sender is almost ready for ${config.fromEmail}. Add the Gmail app password in Admin > Integrations > Email > SMTP password/app password.`,
     );
   }
 
@@ -167,8 +256,11 @@ export async function sendEmailOtp(email: string, otp: string) {
     body: JSON.stringify({
       from,
       to: [email],
+      reply_to: config.replyTo || undefined,
       subject: "Your iksha gifts verification code",
-      html: `<p>Your iksha gifts email OTP is <strong>${otp}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+      html: `<p>Hi ${htmlEscape(name)},</p><p>Your iksha gifts email OTP is <strong>${htmlEscape(
+        otp,
+      )}</strong>.</p><p>This code expires in 10 minutes.</p>`,
     }),
   });
 

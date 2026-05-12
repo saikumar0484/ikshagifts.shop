@@ -1596,3 +1596,883 @@ Live smoke check:
   - `frame-src https://*.razorpay.com`
   - `form-action ... https://*.razorpay.com`
 - Live Permissions-Policy includes payment permission for Razorpay checkout/API origins.
+
+## Checkpoint 33 - Resume From Full Project Safe Zip
+
+Status: Extracted and documented for continuation.
+
+Date: 2026-05-08
+
+Goal:
+
+- Continue from the owner's newer zip archive.
+- Read and preserve all project data carefully.
+- Save durable memory into project files for another Codex/developer.
+
+Source archive:
+
+```text
+C:\Users\Admin\Documents\New project 2\ikshagifts-shop-full-project-safe-20260507-214118.zip
+```
+
+Extracted folder:
+
+```text
+C:\Users\Admin\Documents\New project 2\ikshagifts-shop-full-project-safe-20260507-214118-extracted\ikshagifts-shop
+```
+
+What changed:
+
+- Extracted the archive into a separate folder without modifying the original zip.
+- Read the main project handoff docs:
+  - `README.md`
+  - `CODEX_CHECKPOINTS.md`
+  - `DEVELOPER_HANDOFF.md`
+- Inspected key setup files:
+  - `package.json`
+  - `vercel.json`
+  - `supabase/schema.sql`
+- Created `FULL_ZIP_FILE_INVENTORY.md` with file paths, byte sizes, line counts for text files, and SHA-256 hashes.
+- Created `CURRENT_CODEX_MEMORY.md` with the current resume context, project understanding, owner rules, and next steps.
+- Updated `README.md` with the new resume location.
+
+Important notes:
+
+- The zip contains `supabase-project-access.txt`, which should be treated as private.
+- No passwords, API keys, service-role keys, or sensitive values were printed in chat.
+- The project should continue from this extracted folder unless the owner provides a newer archive.
+
+Verification:
+
+- File inventory completed for the extracted project.
+- Original archive remains untouched.
+- `npm.cmd install` completed successfully.
+- `npm.cmd run build` passed.
+- `npm.cmd run lint` passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 34 - Preview Links Only, No Live Publish
+
+Status: Preview links prepared.
+
+Date: 2026-05-08
+
+Goal:
+
+- Give the owner local and cloud preview links for storefront and admin dashboard.
+- Do not publish/go live until the owner explicitly says go live or publish.
+
+Links:
+
+```text
+Local storefront: http://127.0.0.1:5173/
+Local admin: http://127.0.0.1:5173/admin
+Cloud tunnel storefront: https://hungry-bees-work.loca.lt/
+Cloud tunnel admin: https://hungry-bees-work.loca.lt/admin
+Vercel preview: https://ikshagiftsshop-main-beji813tb-imashokkumarwork-sudos-projects.vercel.app
+Vercel review alias: https://ikshagifts-shop-review-20260508.vercel.app
+```
+
+What changed:
+
+- Started local Vite dev server on port `5173`.
+- Linked the extracted project folder to Vercel project `ikshagifts.shop-main`.
+- Added preview environment variables for Supabase/session/admin values in Vercel.
+- Deployed a Vercel preview build, not production.
+- Added a Vercel review alias to the preview deployment.
+- Started a temporary `loca.lt` cloud tunnel to the local dev server so the owner can review without publishing production.
+
+Important notes:
+
+- The Vercel preview URL and review alias are protected by Vercel authentication.
+- The `loca.lt` links are the usable public cloud preview links while the local tunnel remains running.
+- This did not publish to `ikshagifts.shop`.
+- Future website changes should be shown through preview links first, then only promoted/live after explicit owner approval.
+
+## Checkpoint 35 - Fix Non-Opening Preview Links
+
+Status: Public review link restored.
+
+Date: 2026-05-08
+
+Goal:
+
+- Fix preview links not opening for the owner.
+- Keep the real production website `ikshagifts.shop` untouched.
+
+What changed:
+
+- The temporary `loca.lt` tunnel was found unreliable for owner review.
+- Deployed the current extracted project to the separate Vercel review project alias:
+
+```text
+https://ikshagiftsshop-main.vercel.app/
+https://ikshagiftsshop-main.vercel.app/admin
+```
+
+Important:
+
+- This did not deploy to or alias `ikshagifts.shop`.
+- The owner still must explicitly say go live/publish before touching the real website.
+
+Verification:
+
+- Review storefront returned HTTP 200.
+- Review admin route returned HTTP 200.
+- Review products API returned HTTP 200 with 13 products.
+
+## Checkpoint 36 - MSG91 Mobile OTP And Account Dashboard
+
+Status: Superseded by Checkpoint 37 before preview deployment.
+
+Date: 2026-05-08
+
+Goal:
+
+- Build mobile-only OTP login/register for iksha gifts.
+- Use MSG91 OTP API for OTP delivery and verification.
+- Sync verified mobile users into Supabase Auth and Supabase Database.
+- Add `/account` dashboard with My Orders, Profile, and Logout.
+- Remove customer-facing email/password login UX.
+
+What changed:
+
+- Replaced the customer auth modal with mobile-first OTP UI:
+  - First Name
+  - Mobile Number
+  - Send OTP
+  - Verify OTP
+- Added MSG91 helper:
+  - `api/_lib/msg91.ts`
+- Added Supabase Auth helper:
+  - `api/_lib/supabaseAuth.ts`
+- Reworked auth endpoints:
+  - `api/auth/request-otp.ts`
+  - `api/auth/verify-otp.ts`
+  - `api/auth/login.ts`
+- Added account API:
+  - `api/account.ts`
+- Added account dashboard:
+  - `src/components/site/AccountDashboard.tsx`
+- Updated app routing so `/account` renders the dashboard.
+- Updated account nav behavior.
+- Added Vercel rewrite support for `/account`.
+- Added requested Supabase table in `supabase/schema.sql`:
+
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name TEXT,
+  mobile_number TEXT UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+- Applied Supabase migration `add_mobile_otp_users_table` to the connected Supabase project available in this session.
+- Added `.env.example` with MSG91 variables.
+
+Important implementation note:
+
+- Supabase's built-in phone OTP does not directly use MSG91 as a hosted SMS provider in the documented provider list.
+- This implementation verifies OTP through MSG91, creates/updates the phone user in Supabase Auth using service-role admin APIs, saves profile data in Supabase Database, and keeps the browser logged in through the existing secure HttpOnly server session.
+
+Required before live OTP testing:
+
+```text
+MSG91_AUTH_KEY
+MSG91_OTP_TEMPLATE_ID
+```
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 40 - Faster Smooth Product Image Loading
+
+Status: Deployed to preview alias.
+
+Date: 2026-05-12
+
+Goal:
+
+- Improve website image loading speed and smoothness.
+
+What changed:
+
+- Generated optimized responsive WebP files for all product images at 320, 640, 960, and 1280 widths.
+- Added `scripts/optimize-product-images.mjs` for future regeneration.
+- Added `src/lib/imageOptimization.ts`.
+- Updated `SiteImage` so local product images automatically use optimized WebP `srcSet`.
+- Updated hero, product cards, product detail slider, and cart thumbnails to use proper responsive sizes.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+- Preview alias verified:
+  - `https://ikshagiftsshop-main.vercel.app/` -> 200
+  - `https://ikshagiftsshop-main.vercel.app/admin` -> 200
+  - `https://ikshagiftsshop-main.vercel.app/product-images/optimized/bracelet-640.webp` -> 200 `image/webp`
+
+## Checkpoint 42 - Missing Catalog Versions Table No Longer Breaks Save
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-09
+
+Problem:
+
+- Admin Save showed:
+  - `Could not find the table 'public.catalog_versions' in the schema cache`
+
+Cause:
+
+- `bumpCatalogVersion()` tried to upsert into optional helper table `catalog_versions`.
+- Live Supabase database did not have that table.
+
+Fix:
+
+- Updated `api/_lib/catalog.ts`.
+- Missing `catalog_versions` errors are now ignored by `bumpCatalogVersion()`.
+- Product Save remains connected to Supabase `products`.
+- Realtime/no-cache sync still works through direct admin save notification, products listener, and fallback reload.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 41 - Admin Save Button Live Product Sync
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-09
+
+Goal:
+
+- Keep only the existing Save button.
+- When admin adds/edits a product and clicks Save, data saves to Supabase and website updates without manual refresh/rebuild/redeploy.
+- Keep existing design unchanged.
+
+What changed:
+
+- `src/admin/AdminDashboard.tsx`
+  - Save/Delete/quick stock/visibility updates now call `notifyCatalogChange()` after the Supabase-backed API write succeeds.
+- `src/lib/catalogRealtime.ts`
+  - Added stronger live sync:
+    - Supabase Realtime broadcast event.
+    - Supabase Realtime `products` table listener.
+    - Supabase Realtime `catalog_versions` listener.
+    - Same-browser/cross-tab local sync.
+    - 10-second fallback poll.
+- `src/lib/commerce.tsx`
+  - Product fetch now uses `cache: "no-store"` and timestamp query param.
+- `src/components/site/Shop.tsx`
+  - Collection product fetch now uses `cache: "no-store"` and timestamp query param.
+
+Important behavior:
+
+- No separate Publish button was added.
+- Product data remains fetched dynamically through the live API/Supabase-backed backend.
+- Product name, price, description, images, category, stock, featured, and best-seller changes reload after Save.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 40 - Product Image Gallery And Mobile Grid
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-09
+
+Goal:
+
+- Product image/product grid changes only.
+- Allow minimum 2 images per product.
+- Add image viewer/gallery with swipe.
+- Add admin Image 1/Image 2 upload fields.
+- Show description only in product detail view.
+- Mobile product grid must show 2 products per row.
+- Keep current theme/layout.
+
+What changed:
+
+- `src/components/site/Shop.tsx`
+  - Added product detail modal.
+  - Added smooth image slider with previous/next buttons and mobile swipe support.
+  - Product cards now open detail modal when image/name is clicked.
+  - Removed homepage/card description display.
+  - Mobile grid now uses 2 columns, desktop/tablet uses 3.
+  - Product cards now use consistent image ratio and title height for alignment.
+- `src/admin/AdminDashboard.tsx`
+  - Added Image 1 URL and Image 2 URL fields.
+  - Added Image 1 Upload and Image 2 Upload fields.
+  - Product preview/list use image 1 cleanly.
+- `api/admin.ts`, `api/_lib/catalog.ts`, `src/lib/commerce.tsx`, `src/data/products.ts`
+  - Added two-image parsing/support.
+  - Stored both URLs compatibly in the existing `image_url` value so no risky live DB migration is required.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 38 - Admin Best Seller Product Category
+
+Status: Preview/public cloud alias updated.
+
+Date: 2026-05-08
+
+Goal:
+
+- In Admin Dashboard > Add Product, add `Best Seller` as a category option along with Women, Men, and Customized.
+
+What changed:
+
+- Added `best_seller` / `Best Seller` to shared product categories:
+  - `src/data/products.ts`
+  - `api/_lib/catalog.ts`
+- Updated admin product API validation to accept Best Seller.
+- Added compatibility handling in `api/admin.ts` because the live Supabase products table still has the old category check constraint:
+  - Best Seller selected in admin saves safely as `customized_gifts`.
+  - Best Seller products get the Best Seller tag/featured behavior.
+  - Admin product listing maps Best Seller-tagged customized products back to category `Best Seller`.
+  - Admin category filter supports `best_seller`.
+- `supabase/schema.sql` also includes the intended future `best_seller` category allowance.
+
+Database note:
+
+- A live direct Supabase DB constraint migration was not applied because the database password note available locally appears to reference an older project.
+- The deployed app works around the live constraint without requiring the DB change.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+- Public cloud alias verified with HTTP 200:
+  - `https://ikshagiftsshop-main.vercel.app/`
+  - `https://ikshagiftsshop-main.vercel.app/admin`
+
+## Checkpoint 39 - Coupon Minimum Cart Value
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Goal:
+
+- Coupon/code must not apply when cart value is below 299.
+- If the user tries on a low cart value, show a small message below the code apply area.
+
+What changed:
+
+- Updated cart coupon UI in `src/components/site/CartDrawer.tsx`.
+- Added minimum coupon cart value:
+  - 299
+- Low-cart coupon attempt now shows:
+  - `Add minimum ₹299 to apply coupon.`
+- Small helper text under coupon apply now says:
+  - `Minimum cart value ₹299 required to apply code.`
+- If a coupon is already applied and the user reduces cart below 299, the coupon is removed automatically.
+- Updated `api/orders.ts` so server checkout validation also blocks coupon usage below 299.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 47 - OTP Spam Mail Text
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Owner request:
+
+- Replace OTP instruction copy with spam-folder reminder.
+
+What changed:
+
+- `AuthModal` now shows: `Enter the OTP sent to your email address (Check In Spam Mail).`
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 44 - Gmail App Password Saved
+
+Status: Confirmed in Supabase.
+
+Date: 2026-05-08
+
+What happened:
+
+- Owner saved the Gmail app password in Admin -> Integrations -> Email.
+- Supabase `integration_settings` for `key = email` now shows encrypted secrets for `smtpUser` and `smtpPass`.
+
+Security note:
+
+- Do not record the actual app password in repository files, memory notes, or final handoff text.
+
+Current Email integration:
+
+- Provider: SMTP
+- Enabled: true
+- From email: `katreddyisha@gmail.com`
+- Reply-to email: `katreddyisha@gmail.com`
+- SMTP host: `smtp.gmail.com`
+- SMTP port: `465`
+- SMTP secure: `true`
+
+Next verification:
+
+- Send OTP from `/account` and confirm the customer receives the OTP email.
+
+## Checkpoint 45 - Product Catalog 4K Preview Images
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Owner request:
+
+- List available products and generate 4K pictures for each product so the website looks fully developed for testing.
+
+Available products:
+
+- Stylish Bracelet
+- Premium Couple Watches
+- Couple Bracelets Set
+- Elegant Women Watch
+- Classic Men Watch
+- Small Flower Bouquet
+- Grand Flower Bouquet
+- Small Gift Hamper
+- Luxury Gift Hamper
+- Customized Magazine Gift
+- Women Couple Bracelet
+- Men Couple Bracelet
+- Women & Men Couple Watches
+
+What changed:
+
+- Generated 13 high-resolution 3840x2160 JPEG product preview images.
+- Saved images in `public/product-images/`.
+- Updated `src/data/products.ts` fallback image paths.
+- Updated `supabase/schema.sql` seed image paths.
+- Updated Supabase `products.image_url` rows to use `/product-images/<product-id>.jpg`.
+- Added helper scripts:
+  - `scripts/generate-product-images.mjs`
+  - `scripts/update-product-image-urls.mjs`
+
+Verification:
+
+```powershell
+node scripts\generate-product-images.mjs
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- All generated images verified at 3840x2160.
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+Note:
+
+- These are test/preview catalog images, not final real product photography.
+
+## Checkpoint 46 - OTP Resend UX Cleanup
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Owner request:
+
+- Remove `I already have an OTP`.
+- Remove 1-hour wait.
+- Keep 1-minute wait, then allow resend OTP.
+
+What changed:
+
+- Removed the `I already have an OTP` button from `AuthModal`.
+- Rate-limit errors now store a 60-second retry timer instead of 60 minutes.
+- Error message now says: wait 1 minute, then resend OTP.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 42 - Admin Email Integration For OTP And Store Communication
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Owner direction:
+
+- Leave Supabase built-in OTP email because it is rate-limited.
+- Use Admin Dashboard -> Integrations -> Email for all store communication:
+  - signup/signin OTP
+  - order placed
+  - payment received
+  - order status updates
+  - delivered notifications
+
+What changed:
+
+- `/api/auth/request-otp` no longer calls Supabase Auth `/otp`.
+- `/api/auth/request-otp` now creates an OTP, stores a hashed pending login/signup record in `pending_signups`, and sends email through the store email integration.
+- `/api/auth/verify-otp` now validates the pending OTP and creates/updates `customers` plus `users` in Supabase Database.
+- `src/components/site/AuthModal.tsx` now uses the commerce API login flow instead of browser Supabase Auth.
+- `api/_lib/otp.ts` now supports a centralized store email sender with SMTP or Resend.
+- `api/_lib/integrations.ts` now stores SMTP public config and encrypted SMTP secrets.
+- `src/admin/AdminDashboard.tsx` now shows SMTP host, port, SSL/TLS, username, and password fields under Email integration.
+- `api/orders.ts`, `api/payments/verify.ts`, and `api/admin.ts` now send customer emails for order placed, payment received, and order status updates when a real customer email exists.
+- `.env.example` now documents SMTP and Resend variables.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+Setup needed by owner:
+
+- In Admin -> Integrations -> Email, choose SMTP or Resend, enable it, fill credentials, and save.
+- For Gmail SMTP, use an app password.
+
+## Checkpoint 43 - Preconfigure Owner Gmail
+
+Status: Implemented and verified.
+
+Date: 2026-05-08
+
+Owner request:
+
+- Use `katreddyisha@gmail.com` as the sender email for OTP and all customer communication.
+
+What changed:
+
+- Code defaults for Email integration now use `katreddyisha@gmail.com`.
+- Gmail SMTP defaults are set to:
+  - host `smtp.gmail.com`
+  - port `465`
+  - secure `true`
+- Applied Supabase migration `enable_katreddyisha_gmail_email_integration`.
+- Supabase `integration_settings` now has Email enabled with provider `smtp` and public config for `katreddyisha@gmail.com`.
+- OTP missing-credential error now explains that Gmail app password must be added.
+
+Still required:
+
+- Owner must add a Gmail app password in Admin -> Integrations -> Email -> SMTP password/app password.
+- Gmail cannot send OTP emails from only the email address.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 41 - Existing OTP Entry During Rate Limit
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Issue:
+
+- Owner saw the friendly rate-limit message but still needed a way to continue login using the latest email already sent.
+
+What changed:
+
+- On Supabase rate-limit errors, `AuthModal` now switches to the OTP verification step.
+- The rate-limit message now tells the customer to enter the latest OTP/code already sent or open the latest login link.
+- Added an `I already have an OTP` button on the first auth step.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+## Checkpoint 38 - Email OTP Delivery Troubleshooting
+
+Status: Notes and local configuration completed.
+
+Date: 2026-05-08
+
+Issue:
+
+- Owner reported that OTP was not coming by email on `/account`.
+
+Findings:
+
+- Local development did not originally have Vite Supabase public environment variables, so local browser OTP could not reliably call Supabase Auth.
+- `.env.local` was added with the public Supabase URL and publishable anon key, and the local Vite server was restarted on port 5173.
+- Supabase Auth logs for project `itrpsxjdtvfqhgacozsm` showed successful OTP requests and `mail.send` events.
+- Logs used `mail_type: magic_link`, which means Supabase is sending email but the default email body may show a link instead of a visible OTP code.
+
+Action saved:
+
+- Added `SUPABASE_EMAIL_OTP_SETUP.md` with the exact Supabase Dashboard email template steps.
+
+Required manual dashboard step:
+
+- Supabase Dashboard -> Authentication -> Email Templates -> Magic Link must include `{{ .Token }}` so customers can type the OTP into the website.
+
+## Checkpoint 39 - Supabase Email Link Fallback
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Goal:
+
+- Make customer auth more forgiving while the Supabase Magic Link template is being changed to show `{{ .Token }}`.
+
+What changed:
+
+- `src/lib/supabaseClient.ts` now enables `detectSessionInUrl`.
+- `src/components/site/AuthModal.tsx` now passes `emailRedirectTo: current-origin/account` when requesting OTP.
+- `src/components/site/AuthModal.tsx` now tells customers they can open the email login link if the email shows a link.
+- `src/lib/commerce.tsx` now syncs an existing Supabase browser session into the existing server-side session on page load and auth state changes.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+Invoke-WebRequest -Uri http://127.0.0.1:5173/account -UseBasicParsing
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+- Local `/account` returned HTTP 200.
+- Preview deployment succeeded and was aliased to `https://ikshagiftsshop-main.vercel.app/`.
+- Cloud `/` and `/account` returned HTTP 200.
+
+Still required:
+
+- Supabase Auth Email Template must be edited through the dashboard or Management API using a Supabase access token. The currently connected Supabase plugin can read logs and apply migrations, but it does not expose Auth email template editing.
+
+## Checkpoint 40 - Email OTP Rate Limit UX
+
+Status: Implemented and verified locally.
+
+Date: 2026-05-08
+
+Issue:
+
+- Owner reported `email rate limit exceeded` when trying to log in.
+
+Findings:
+
+- Supabase Auth logs showed `/otp` returning HTTP 429 with `error_code: over_email_send_rate_limit`.
+- This is a Supabase email sending limit, not a React UI crash.
+- Supabase docs say hosted projects have strict email send limits on the built-in email sender, and production should use a custom SMTP provider.
+
+What changed:
+
+- `src/components/site/AuthModal.tsx` now stores an OTP retry timer per email.
+- After a successful OTP request, the customer must wait 60 seconds before requesting another OTP for the same email.
+- If Supabase returns a rate-limit error, the customer sees a friendly message and a 60-minute retry timer instead of repeated raw errors.
+- The Verify OTP flow remains available after an OTP has already been requested.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.
+
+Preview deployment:
+
+```text
+https://ikshagiftsshop-main.vercel.app/
+https://ikshagiftsshop-main.vercel.app/account
+```
+
+Preview verification:
+
+- Review storefront returned HTTP 200.
+- Review `/account` returned HTTP 200.
+- Review products API returned HTTP 200 with 13 products.
+
+Important:
+
+- This was deployed only to the separate `ikshagiftsshop-main.vercel.app` review project alias.
+- This did not publish to the real `https://ikshagifts.shop` domain.
+
+Superseded:
+
+- The owner changed the requirement from MSG91 mobile OTP to free Supabase Email OTP before this implementation was deployed.
+- See Checkpoint 37 for the active auth direction.
+
+## Checkpoint 37 - Free Supabase Email OTP And Account Dashboard
+
+Status: Preview implementation completed.
+
+Date: 2026-05-08
+
+Goal:
+
+- Build free Email OTP login/register using Supabase Auth only.
+- Use Supabase Database for profile and order data.
+- No password login.
+- No SMS/mobile OTP.
+- Redirect verified users to `/account`.
+
+What changed:
+
+- Installed `@supabase/supabase-js`.
+- Added browser Supabase client:
+  - `src/lib/supabaseClient.ts`
+- Replaced customer auth modal with Email OTP fields:
+  - First Name
+  - Email Address
+  - Send OTP
+  - Verify OTP
+- Auth modal now calls:
+  - `supabase.auth.signInWithOtp({ email })`
+  - `supabase.auth.verifyOtp({ email, token, type: "email" })`
+- After Supabase verification, the app syncs the verified Supabase session to the existing secure server session for orders/cart APIs.
+- Added/updated server auth bridge:
+  - `api/auth/request-otp.ts`
+  - `api/auth/verify-otp.ts`
+  - `api/auth/login.ts`
+- Added `/account` dashboard with:
+  - My Orders
+  - Profile
+  - Logout
+- Profile shows:
+  - First Name
+  - Email Address
+- Profile allows editing first name only.
+- Email changes are not allowed without a new OTP verification flow.
+- Logout now calls Supabase sign out and clears the server session.
+- Updated Supabase `users` table shape to:
+
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name TEXT,
+  email TEXT UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+- Applied Supabase migration `switch_users_table_to_email_otp` to the connected project available in this session.
+- Removed MSG91 helper files from the active code path.
+
+Required Supabase Dashboard settings:
+
+- Authentication -> Providers -> Email -> enable Email Provider.
+- Authentication -> Providers -> Email -> enable Confirm Email.
+- Authentication -> Email Templates -> use an OTP template with `{{ .Token }}`.
+
+Verification:
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
+
+Result:
+
+- Build passed.
+- Lint passed with 0 errors and 8 existing Fast Refresh warnings.

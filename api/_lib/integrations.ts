@@ -31,8 +31,11 @@ const defaultIntegrations: Record<IntegrationView["key"], Omit<IntegrationView, 
     status: "needs_setup",
     publicConfig: {
       fromName: "iksha gifts",
-      fromEmail: "hello@ikshagifts.shop",
-      replyTo: "hello@ikshagifts.shop",
+      fromEmail: "katreddyisha@gmail.com",
+      replyTo: "katreddyisha@gmail.com",
+      smtpHost: "smtp.gmail.com",
+      smtpPort: "465",
+      smtpSecure: "true",
     },
     updatedAt: null,
   },
@@ -118,6 +121,9 @@ function normalizePublicConfig(key: IntegrationView["key"], body: Record<string,
       fromName: safeString(body.fromName, 80) || "iksha gifts",
       fromEmail: safeString(body.fromEmail, 160),
       replyTo: safeString(body.replyTo, 160),
+      smtpHost: safeString(body.smtpHost, 160),
+      smtpPort: safeString(body.smtpPort || "465", 8),
+      smtpSecure: safeString(body.smtpSecure || "true", 8) === "false" ? "false" : "true",
     };
   }
 
@@ -152,6 +158,9 @@ function statusFor(
   if (key === "whatsapp" && provider === "manual") return "manual";
   if (key === "whatsapp" && provider === "whatsapp_cloud") {
     return secrets.apiToken && secrets.senderId ? "ready" : "needs_setup";
+  }
+  if (key === "email" && provider === "smtp") {
+    return secrets.smtpPass ? "ready" : "needs_setup";
   }
   if (key === "razorpay") {
     return secrets.keySecret ? "ready" : "needs_setup";

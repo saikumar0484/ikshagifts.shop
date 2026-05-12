@@ -20,6 +20,7 @@ import {
 import { db, uploadStorageObject } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
 import { listIntegrations, saveIntegration } from "./_lib/integrations.js";
+import { sendStoreEmail } from "./_lib/otp.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "./_lib/security.js";
 import {
   addSupportNote,
@@ -81,6 +82,38 @@ const labels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+function canEmailCustomer(email?: string | null) {
+  return Boolean(email && !email.endsWith("@orders.ikshagifts.local"));
+}
+
+async function sendOrderStatusEmail(order: any, status: string) {
+  const customer = await db.selectOne<CustomerRow>("customers", { id: order.user_id });
+  if (!canEmailCustomer(customer?.email)) return;
+  const label = labels[status] || status;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemText = items
+    .map((item: { name?: string; quantity?: number }) => `${item.quantity || 1} x ${item.name}`)
+    .join(", ");
+  await sendStoreEmail({
+    to: customer!.email,
+    subject: `iksha gifts order ${order.id}: ${label}`,
+    text: `Hi ${customer!.name}, your iksha gifts order ${order.id} is now ${label}. ${
+      itemText ? `Items: ${itemText}.` : ""
+    }`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#241f1a">
+        <h2 style="margin:0 0 12px">Your order is ${label}</h2>
+        <p>Hi ${customer!.name},</p>
+        <p>Your iksha gifts order <strong>${order.id}</strong> is now <strong>${label}</strong>.</p>
+        ${itemText ? `<p><strong>Items:</strong> ${itemText}</p>` : ""}
+        ${order.tracking_number ? `<p><strong>Tracking:</strong> ${order.tracking_number}</p>` : ""}
+        ${order.estimated_delivery ? `<p><strong>Estimated delivery:</strong> ${order.estimated_delivery}</p>` : ""}
+        <p>Thank you for shopping with iksha gifts.</p>
+      </div>
+    `,
+  }).catch(() => undefined);
+}
+
 function actionFrom(req: any) {
   const direct = String(req.query?.action || "");
   if (direct) return direct;
@@ -97,22 +130,51 @@ function slugify(value: string) {
     .slice(0, 80);
 }
 
+function normalizeAdminCategory(product: ProductRow) {
+  const tag = String(product.tag || "").toLowerCase();
+  if (product.category === "customized_gifts" && tag.includes("best seller")) {
+    return "best_seller";
+  }
+  return product.category;
+}
+
+function splitProductImages(imageUrl?: string | null, image2Url?: string | null) {
+  const images = String(imageUrl || "")
+    .split("||")
+    .map((image) => image.trim())
+    .filter(Boolean);
+  if (image2Url) images[1] = image2Url;
+  return [images[0] || "", images[1] || ""];
+}
+
+function combineProductImages(body: any) {
+  const images = splitProductImages(
+    body.imageUrl || body.image_url,
+    body.image2Url || body.image_url_2,
+  );
+  return images.filter(Boolean).join("||") || null;
+}
+
 function productBody(body: any) {
   const name = safeString(body.name, 120);
   if (!name) throw new Error("Product name is required.");
   const id = safeString(body.id || slugify(name), 100);
   const category = safeString(body.category || "", 80);
   if (!isProductCategory(category)) {
-    throw new Error("Choose Women, Men, or Customized Gifts for the product category.");
+    throw new Error(
+      "Choose Women, Men, Customized Gifts, or Best Seller for the product category.",
+    );
   }
   const isAvailable = body.isAvailable ?? body.is_available;
+  const isBestSeller = category === "best_seller";
+  const tag = safeString(body.tag || (isBestSeller ? "Best Seller" : "New"), 60);
   return {
     id,
     name,
-    category,
-    tag: safeString(body.tag || "New", 60),
+    category: isBestSeller ? "customized_gifts" : category,
+    tag: isBestSeller && !tag.toLowerCase().includes("best seller") ? "Best Seller" : tag,
     description: safeString(body.description || body.desc, 500),
-    image_url: safeString(body.imageUrl || body.image_url, 500) || null,
+    image_url: safeString(combineProductImages(body), 1000) || null,
     price: Math.max(0, Math.round(Number(body.price) || 0)),
     old_price:
       body.oldPrice || body.old_price
@@ -122,7 +184,7 @@ function productBody(body: any) {
     delivery: safeString(body.delivery || "Ships in 4-6 days", 80),
     stock_quantity: Math.max(0, Math.round(Number(body.stockQuantity ?? body.stock_quantity ?? 0))),
     is_available: isAvailable === undefined ? true : Boolean(isAvailable),
-    is_featured: Boolean(body.isFeatured ?? body.is_featured),
+    is_featured: isBestSeller || Boolean(body.isFeatured ?? body.is_featured),
     sort_order: Math.round(Number(body.sortOrder ?? body.sort_order ?? 100)),
     updated_at: new Date().toISOString(),
   };
@@ -264,17 +326,26 @@ export default async function handler(req: any, res: any) {
         const products = category
           ? await db.selectMany<ProductRow>(
               "products",
-              { category },
+              { category: category === "best_seller" ? "customized_gifts" : category },
               { order: "sort_order.asc,name.asc" },
             )
           : await db.list<ProductRow>("products", {
               order: "sort_order.asc,name.asc",
             });
         json(res, 200, {
-          products: products.map((product) => ({
-            ...product,
-            category_label: categoryLabel(product.category),
-          })),
+          products: products
+            .map((product) => {
+              const adminCategory = normalizeAdminCategory(product);
+              const images = splitProductImages(product.image_url);
+              return {
+                ...product,
+                image_url: images[0],
+                image_url_2: images[1],
+                category: adminCategory,
+                category_label: categoryLabel(adminCategory),
+              };
+            })
+            .filter((product) => !category || product.category === category),
         });
         return;
       }
@@ -477,6 +548,7 @@ export default async function handler(req: any, res: any) {
           ],
         },
       );
+      await sendOrderStatusEmail(updated || order, status);
       json(res, 200, { order: updated });
       return;
     }

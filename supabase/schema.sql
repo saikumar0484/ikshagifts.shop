@@ -33,6 +33,13 @@ create table if not exists public.customer_sessions (
   expires_at timestamptz not null
 );
 
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  first_name text,
+  email text unique,
+  created_at timestamp default now()
+);
+
 create table if not exists public.admin_users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -195,6 +202,7 @@ create table if not exists public.support_message_templates (
 alter table public.customers enable row level security;
 alter table public.pending_signups enable row level security;
 alter table public.customer_sessions enable row level security;
+alter table public.users enable row level security;
 alter table public.admin_users enable row level security;
 alter table public.admin_sessions enable row level security;
 alter table public.carts enable row level security;
@@ -231,15 +239,16 @@ update public.products
 set category = case
   when lower(category) = 'women' then 'women'
   when lower(category) = 'men' then 'men'
+  when lower(category) in ('best seller', 'best_seller', 'bestseller') then 'best_seller'
   else 'customized_gifts'
 end
-where category not in ('women', 'men', 'customized_gifts');
+where category not in ('women', 'men', 'customized_gifts', 'best_seller');
 
 alter table public.products
   drop constraint if exists products_category_check;
 
 alter table public.products
-  add constraint products_category_check check (category in ('women', 'men', 'customized_gifts'));
+  add constraint products_category_check check (category in ('women', 'men', 'customized_gifts', 'best_seller'));
 
 create or replace function public.set_products_updated_at()
 returns trigger
@@ -260,6 +269,10 @@ execute function public.set_products_updated_at();
 revoke execute on function public.set_products_updated_at() from public;
 
 create index if not exists orders_user_created_idx on public.orders(user_id, created_at desc);
+alter table public.users
+  add column if not exists email text;
+
+create unique index if not exists users_email_idx on public.users(email);
 create index if not exists pending_signups_expires_idx on public.pending_signups(expires_at);
 create index if not exists admin_users_role_active_idx on public.admin_users(role, is_active);
 create index if not exists admin_sessions_expires_idx on public.admin_sessions(expires_at);
@@ -385,19 +398,19 @@ insert into public.products (
   is_featured,
   sort_order
 ) values
-  ('bracelet', 'Stylish Bracelet', 'women', 'New', 'A trendy bracelet designed to elevate your everyday look with elegance and charm.', 'https://via.placeholder.com/300?text=Bracelet', 5000, 6000, 4.8, '', 25, true, true, 10),
-  ('couple-watches', 'Premium Couple Watches', 'customized_gifts', 'Couple', 'A perfect matching watch set for couples, symbolizing love and timeless bonding.', 'https://via.placeholder.com/300?text=Couple+Watches', 5000, 6000, 4.8, '', 25, true, true, 20),
-  ('couple-bracelets', 'Couple Bracelets Set', 'customized_gifts', 'Couple', 'Beautiful matching bracelets crafted for couples to celebrate their connection.', 'https://via.placeholder.com/300?text=Couple+Bracelets', 5000, 6000, 4.8, '', 25, true, true, 30),
-  ('women-watch', 'Elegant Women Watch', 'women', 'Elegant', 'A stylish and modern watch designed for women who love sophistication.', 'https://via.placeholder.com/300?text=Women+Watch', 5000, 6000, 4.8, '', 25, true, true, 40),
-  ('men-watch', 'Classic Men Watch', 'men', 'Classic', 'A bold and classy watch built for men who appreciate timeless fashion.', 'https://via.placeholder.com/300?text=Men+Watch', 5000, 6000, 4.8, '', 25, true, true, 50),
-  ('small-bouquet', 'Small Flower Bouquet', 'customized_gifts', 'Bouquet', 'A cute bouquet arrangement perfect for small surprises and sweet moments.', 'https://via.placeholder.com/300?text=Small+Bouquet', 5000, 6000, 4.8, '', 25, true, false, 60),
-  ('large-bouquet', 'Grand Flower Bouquet', 'customized_gifts', 'Bouquet', 'A luxurious bouquet designed to make every occasion extra special.', 'https://via.placeholder.com/300?text=Large+Bouquet', 5000, 6000, 4.8, '', 25, true, false, 70),
-  ('small-hamper', 'Small Gift Hamper', 'customized_gifts', 'Hamper', 'A compact hamper filled with delightful surprises for your loved ones.', 'https://via.placeholder.com/300?text=Small+Hamper', 5000, 6000, 4.8, '', 25, true, false, 80),
-  ('large-hamper', 'Luxury Gift Hamper', 'customized_gifts', 'Hamper', 'A premium hamper packed with exclusive gifts to impress and delight.', 'https://via.placeholder.com/300?text=Large+Hamper', 5000, 6000, 4.8, '', 25, true, false, 90),
-  ('magazine-gift', 'Customized Magazine Gift', 'customized_gifts', 'Custom', 'A unique magazine-style gift designed to capture memories creatively.', 'https://via.placeholder.com/300?text=Magazine+Gift', 5000, 6000, 4.8, '', 25, true, false, 100),
-  ('women-couple-bracelet', 'Women Couple Bracelet', 'women', 'Couple', 'A stylish bracelet specially crafted for women in a couple set.', 'https://via.placeholder.com/300?text=Women+Bracelet', 5000, 6000, 4.8, '', 25, true, false, 110),
-  ('men-couple-bracelet', 'Men Couple Bracelet', 'men', 'Couple', 'A bold and elegant bracelet designed for men in a couple set.', 'https://via.placeholder.com/300?text=Men+Bracelet', 5000, 6000, 4.8, '', 25, true, false, 120),
-  ('women-couple-watches', 'Women Couple Watches', 'women', 'Couple', 'A beautifully designed watch set perfect for couples who love matching styles.', 'https://via.placeholder.com/300?text=Women+Couple+Watches', 5000, 6000, 4.8, '', 25, true, false, 130)
+  ('bracelet', 'Stylish Bracelet', 'women', 'New', 'A trendy bracelet designed to elevate your everyday look with elegance and charm.', '/product-images/bracelet.jpg', 5000, 6000, 4.8, '', 25, true, true, 10),
+  ('couple-watches', 'Premium Couple Watches', 'customized_gifts', 'Couple', 'A perfect matching watch set for couples, symbolizing love and timeless bonding.', '/product-images/couple-watches.jpg', 5000, 6000, 4.8, '', 25, true, true, 20),
+  ('couple-bracelets', 'Couple Bracelets Set', 'customized_gifts', 'Couple', 'Beautiful matching bracelets crafted for couples to celebrate their connection.', '/product-images/couple-bracelets.jpg', 5000, 6000, 4.8, '', 25, true, true, 30),
+  ('women-watch', 'Elegant Women Watch', 'women', 'Elegant', 'A stylish and modern watch designed for women who love sophistication.', '/product-images/women-watch.jpg', 5000, 6000, 4.8, '', 25, true, true, 40),
+  ('men-watch', 'Classic Men Watch', 'men', 'Classic', 'A bold and classy watch built for men who appreciate timeless fashion.', '/product-images/men-watch.jpg', 5000, 6000, 4.8, '', 25, true, true, 50),
+  ('small-bouquet', 'Small Flower Bouquet', 'customized_gifts', 'Bouquet', 'A cute bouquet arrangement perfect for small surprises and sweet moments.', '/product-images/small-bouquet.jpg', 5000, 6000, 4.8, '', 25, true, false, 60),
+  ('large-bouquet', 'Grand Flower Bouquet', 'customized_gifts', 'Bouquet', 'A luxurious bouquet designed to make every occasion extra special.', '/product-images/large-bouquet.jpg', 5000, 6000, 4.8, '', 25, true, false, 70),
+  ('small-hamper', 'Small Gift Hamper', 'customized_gifts', 'Hamper', 'A compact hamper filled with delightful surprises for your loved ones.', '/product-images/small-hamper.jpg', 5000, 6000, 4.8, '', 25, true, false, 80),
+  ('large-hamper', 'Luxury Gift Hamper', 'customized_gifts', 'Hamper', 'A premium hamper packed with exclusive gifts to impress and delight.', '/product-images/large-hamper.jpg', 5000, 6000, 4.8, '', 25, true, false, 90),
+  ('magazine-gift', 'Customized Magazine Gift', 'customized_gifts', 'Custom', 'A unique magazine-style gift designed to capture memories creatively.', '/product-images/magazine-gift.jpg', 5000, 6000, 4.8, '', 25, true, false, 100),
+  ('women-couple-bracelet', 'Women Couple Bracelet', 'women', 'Couple', 'A stylish bracelet specially crafted for women in a couple set.', '/product-images/women-couple-bracelet.jpg', 5000, 6000, 4.8, '', 25, true, false, 110),
+  ('men-couple-bracelet', 'Men Couple Bracelet', 'men', 'Couple', 'A bold and elegant bracelet designed for men in a couple set.', '/product-images/men-couple-bracelet.jpg', 5000, 6000, 4.8, '', 25, true, false, 120),
+  ('women-couple-watches', 'Women Couple Watches', 'women', 'Couple', 'A beautifully designed watch set perfect for couples who love matching styles.', '/product-images/women-couple-watches.jpg', 5000, 6000, 4.8, '', 25, true, false, 130)
 on conflict (id) do update set
   name = excluded.name,
   category = excluded.category,

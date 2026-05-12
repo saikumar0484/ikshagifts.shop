@@ -16,6 +16,7 @@ import {
   products,
 } from "@/data/products";
 import { subscribeToCatalogChanges } from "@/lib/catalogRealtime";
+import { supabase } from "@/lib/supabaseClient";
 
 type User = {
   id: string;
@@ -136,24 +137,26 @@ type CommerceContextValue = {
   updateQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  login: (payload: EmailLoginPayload) => Promise<{ otpRequested?: boolean } | void>;
-  requestSignupOtp: (payload: EmailSignupPayload) => Promise<void>;
-  verifySignupOtp: (payload: { otp: string }) => Promise<void>;
+  login: (
+    payload: EmailOtpPayload,
+  ) => Promise<{ otpRequested?: boolean; pendingId?: string } | void>;
+  requestSignupOtp: (payload: EmailOtpPayload) => Promise<void>;
+  verifySignupOtp: (payload: {
+    email: string;
+    firstName: string;
+    pendingId: string;
+    otp: string;
+  }) => Promise<void>;
+  updateProfile: (payload: { firstName: string }) => Promise<void>;
   logout: () => Promise<void>;
   placeOrder: (couponCode?: string, details?: CheckoutDetails) => Promise<void>;
   loadOrders: () => Promise<void>;
   getProduct: (productId: string) => Product | undefined;
 };
 
-type EmailLoginPayload = {
+type EmailOtpPayload = {
+  firstName: string;
   email: string;
-  otp?: string;
-};
-
-type EmailSignupPayload = {
-  name: string;
-  email: string;
-  phone?: string;
 };
 
 const CommerceContext = createContext<CommerceContextValue | null>(null);
@@ -167,6 +170,9 @@ type IdleWindow = Window & {
 type ManagedProductRow = Product & {
   imageUrl?: string;
   image_url?: string;
+  image2Url?: string;
+  image2_url?: string;
+  images?: string[];
   cartUrl?: string;
   cart_url?: string;
   categorySlug?: string;
@@ -187,13 +193,57 @@ type ManagedProductRow = Product & {
 };
 
 function isBlockedPlaceholderImage(value?: string | null) {
-  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+  return Boolean(
+    value &&
+    (/(^https?:\/\/)?via\.placeholder\.com\//i.test(value) ||
+      /drive\.google\.com\/drive\/folders\//i.test(value)),
+  );
+}
+
+function normalizeExternalImageUrl(value?: string | null) {
+  const image = String(value || "").trim();
+  const driveMatch = image.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  const driveOpenMatch = image.match(/[?&]id=([^&]+)/i);
+  const driveId =
+    driveMatch?.[1] || (image.includes("drive.google.com") ? driveOpenMatch?.[1] : "");
+  if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`;
+  return image;
 }
 
 function resolveProductImage(product: ManagedProductRow, fallback?: Product) {
-  const image = product.imageUrl || product.image_url || product.image;
+  const image = resolveProductImages(product, fallback)[0];
   if (image && !isBlockedPlaceholderImage(image)) return image;
   return fallback?.image || placeholderImage(product.name || "Gift");
+}
+
+function splitStoredImages(value?: string | null) {
+  return String(value || "")
+    .split("||")
+    .map(normalizeExternalImageUrl)
+    .filter((image) => image && !isBlockedPlaceholderImage(image));
+}
+
+function resolveProductImages(product: ManagedProductRow, fallback?: Product) {
+  const storedImages = splitStoredImages(product.image_url);
+  const directImages = Array.isArray(product.images) ? product.images : [];
+  const images = [
+    ...directImages,
+    normalizeExternalImageUrl(product.imageUrl),
+    normalizeExternalImageUrl(product.image2Url),
+    normalizeExternalImageUrl(product.image2_url),
+    ...storedImages,
+    normalizeExternalImageUrl(product.image),
+    ...(fallback?.images || []),
+    normalizeExternalImageUrl(fallback?.imageUrl),
+    normalizeExternalImageUrl(fallback?.image2Url),
+    normalizeExternalImageUrl(fallback?.image2),
+    normalizeExternalImageUrl(fallback?.image),
+  ]
+    .filter((image): image is string => Boolean(image && !isBlockedPlaceholderImage(image)))
+    .filter((image, index, list) => list.indexOf(image) === index);
+  const firstImage = images[0] || placeholderImage(product.name || "Gift");
+  const secondImage = images[1] || firstImage;
+  return [firstImage, secondImage];
 }
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -245,10 +295,34 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [checkout, setCheckout] = useState<CheckoutState>({ status: "idle", message: "" });
-  const [pendingSignupId, setPendingSignupId] = useState("");
+
+  const syncSupabaseSession = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    if (!session?.access_token || !session.user.email) return;
+
+    const metadata = session.user.user_metadata as { first_name?: string } | null;
+    const fallbackName = session.user.email
+      .split("@")[0]
+      ?.replace(/[^a-z0-9]+/gi, " ")
+      .trim();
+    const firstName = metadata?.first_name || fallbackName || "Customer";
+
+    const response = await api<{ user: User }>("/api/auth/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({
+        email: session.user.email,
+        firstName,
+        accessToken: session.access_token,
+      }),
+    });
+    setUser(response.user);
+  }, []);
 
   const loadProducts = useCallback(async () => {
-    const data = await api<{ products: ManagedProductRow[] }>("/api/products");
+    const data = await api<{ products: ManagedProductRow[] }>(`/api/products?t=${Date.now()}`, {
+      cache: "no-store",
+    });
     if (!data.products?.length) return;
     setManagedProducts(
       data.products.map((product) => {
@@ -264,6 +338,9 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
           tag: product.tag || fallback?.tag || "New",
           desc: product.desc || product.description || fallback?.desc || "",
           image: resolveProductImage(product, fallback),
+          images: resolveProductImages(product, fallback),
+          image2: resolveProductImages(product, fallback)[1],
+          image2Url: resolveProductImages(product, fallback)[1],
           cartUrl:
             product.cartUrl || product.cart_url || fallback?.cartUrl || `/cart/add/${product.id}`,
           oldPrice: product.oldPrice ?? product.old_price ?? fallback?.oldPrice,
@@ -292,7 +369,13 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
 
     const hydrateCommerce = () => {
       api<{ user: User | null }>("/api/auth/me")
-        .then((data) => setUser(data.user))
+        .then((data) => {
+          if (data.user) {
+            setUser(data.user);
+            return;
+          }
+          syncSupabaseSession().catch(() => undefined);
+        })
         .catch(() => undefined);
       loadProducts().catch(() => undefined);
     };
@@ -305,7 +388,19 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
-  }, [loadProducts]);
+  }, [loadProducts, syncSupabaseSession]);
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        syncSupabaseSession().catch(() => undefined);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [syncSupabaseSession]);
 
   useEffect(
     () =>
@@ -413,41 +508,57 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
 
   const closeAuth = () => setAuthOpen(false);
 
-  const login = async (payload: EmailLoginPayload) => {
-    const data = await api<{ user?: User; otpRequested?: boolean }>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    if (data.user) {
-      setUser(data.user);
-      setAuthOpen(false);
-      return;
-    }
-    return { otpRequested: data.otpRequested };
+  const login = async (payload: EmailOtpPayload) => {
+    const data = await api<{ email: string; pendingId: string; expiresInSeconds: number }>(
+      "/api/auth/request-otp",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+    return { otpRequested: true, pendingId: data.pendingId };
   };
 
-  const requestSignupOtp = async (payload: EmailSignupPayload) => {
-    const data = await api<{ pendingId: string }>("/api/auth/request-otp", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    setPendingSignupId(data.pendingId);
+  const requestSignupOtp = async (payload: EmailOtpPayload) => {
+    await api<{ email: string; pendingId: string; expiresInSeconds: number }>(
+      "/api/auth/request-otp",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
   };
 
   const logout = async () => {
+    await supabase.auth.signOut().catch(() => undefined);
     await api("/api/auth/logout", { method: "POST" });
     setUser(null);
   };
 
-  const verifySignupOtp = async (payload: { otp: string }) => {
-    if (!pendingSignupId) throw new Error("Please request OTP first.");
-    const data = await api<{ user: User }>("/api/auth/verify-otp", {
+  const verifySignupOtp = async (payload: {
+    email: string;
+    firstName: string;
+    pendingId: string;
+    otp: string;
+  }) => {
+    const data = await api<{ user: User; redirectTo?: string }>("/api/auth/verify-otp", {
       method: "POST",
-      body: JSON.stringify({ pendingId: pendingSignupId, ...payload }),
+      body: JSON.stringify(payload),
     });
     setUser(data.user);
-    setPendingSignupId("");
     setAuthOpen(false);
+    if (window.location.pathname !== "/account") {
+      window.history.pushState(null, "", data.redirectTo || "/account");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  };
+
+  const updateProfile = async (payload: { firstName: string }) => {
+    const data = await api<{ user: User }>("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    setUser(data.user);
   };
 
   const loadOrders = async () => {
@@ -578,6 +689,7 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
         login,
         requestSignupOtp,
         verifySignupOtp,
+        updateProfile,
         logout,
         placeOrder,
         loadOrders,

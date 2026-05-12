@@ -11,6 +11,8 @@ export type CatalogItem = {
   tag?: string;
   desc?: string;
   imageUrl?: string;
+  image2Url?: string;
+  images?: string[];
   oldPrice?: number | null;
   rating?: number;
   delivery?: string;
@@ -24,6 +26,7 @@ export const productCategories = [
   { value: "women", label: "Women", collection: "women" as const },
   { value: "men", label: "Men", collection: "men" as const },
   { value: "customized_gifts", label: "Customized Gifts", collection: "custom" as const },
+  { value: "best_seller", label: "Best Seller", collection: "custom" as const },
 ] as const;
 
 export type ProductCategory = (typeof productCategories)[number]["value"];
@@ -46,12 +49,34 @@ function placeholderImage(label: string) {
 }
 
 function isBlockedPlaceholderImage(value?: string | null) {
-  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+  return Boolean(
+    value &&
+    (/(^https?:\/\/)?via\.placeholder\.com\//i.test(value) ||
+      /drive\.google\.com\/drive\/folders\//i.test(value)),
+  );
+}
+
+function normalizeExternalImageUrl(value: string) {
+  const driveMatch = value.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  const driveOpenMatch = value.match(/[?&]id=([^&]+)/i);
+  const driveId =
+    driveMatch?.[1] || (value.includes("drive.google.com") ? driveOpenMatch?.[1] : "");
+  if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`;
+  return value;
 }
 
 function normalizeImageUrl(row: ProductRow) {
-  if (row.image_url && !isBlockedPlaceholderImage(row.image_url)) return row.image_url;
+  const [firstImage] = normalizeImageUrls(row);
+  if (firstImage) return firstImage;
   return placeholderImage(row.name || "Gift");
+}
+
+function normalizeImageUrls(row: ProductRow) {
+  return String(row.image_url || "")
+    .split("||")
+    .map((image) => image.trim())
+    .map(normalizeExternalImageUrl)
+    .filter((image) => image && !isBlockedPlaceholderImage(image));
 }
 
 export const fallbackCatalog: CatalogItem[] = [
@@ -238,19 +263,27 @@ export type ProductRow = {
 };
 
 export async function bumpCatalogVersion(reason = "products") {
-  await db.upsert(
-    "catalog_versions",
-    {
-      key: "products",
-      reason,
-      version: randomUUID(),
-      updated_at: new Date().toISOString(),
-    },
-    "key",
-  );
+  try {
+    await db.upsert(
+      "catalog_versions",
+      {
+        key: "products",
+        reason,
+        version: randomUUID(),
+        updated_at: new Date().toISOString(),
+      },
+      "key",
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("catalog_versions")) throw error;
+  }
 }
 
 export function normalizeProduct(row: ProductRow): CatalogItem {
+  const images = normalizeImageUrls(row);
+  const firstImage = images[0] || placeholderImage(row.name || "Gift");
+  const secondImage = images[1] || firstImage;
   return {
     id: row.id,
     name: row.name,
@@ -259,7 +292,9 @@ export function normalizeProduct(row: ProductRow): CatalogItem {
     collection: categoryCollection(row.category),
     tag: row.tag,
     desc: row.description,
-    imageUrl: normalizeImageUrl(row),
+    imageUrl: firstImage,
+    image2Url: secondImage,
+    images: [firstImage, secondImage],
     price: Number(row.price) || 0,
     oldPrice: row.old_price,
     rating: Number(row.rating) || 4.8,

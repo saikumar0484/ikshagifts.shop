@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, ShoppingBag, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ShoppingBag, Sparkles, X } from "lucide-react";
 import {
   categoryLabel,
   categoryToCollection,
@@ -13,6 +13,7 @@ import {
 } from "@/data/products";
 import { useCommerce } from "@/lib/commerce";
 import { SiteImage } from "@/components/site/SiteImage";
+import { optimizedProductImage, optimizedProductImageSrcSet } from "@/lib/imageOptimization";
 
 type ShopProps = {
   collectionSlug?: ProductCollection | null;
@@ -21,6 +22,7 @@ type ShopProps = {
 type ProductSectionProps = {
   id: string;
   products: Product[];
+  onViewProduct: (product: Product) => void;
 };
 
 const collectionPills: Array<{ slug: ProductCollection; href: string; label: string }> = [
@@ -30,7 +32,21 @@ const collectionPills: Array<{ slug: ProductCollection; href: string; label: str
 ];
 
 function isBlockedPlaceholderImage(value?: string | null) {
-  return Boolean(value && /(^https?:\/\/)?via\.placeholder\.com\//i.test(value));
+  return Boolean(
+    value &&
+    (/(^https?:\/\/)?via\.placeholder\.com\//i.test(value) ||
+      /drive\.google\.com\/drive\/folders\//i.test(value)),
+  );
+}
+
+function normalizeExternalImageUrl(value?: string | null) {
+  const image = String(value || "").trim();
+  const driveMatch = image.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  const driveOpenMatch = image.match(/[?&]id=([^&]+)/i);
+  const driveId =
+    driveMatch?.[1] || (image.includes("drive.google.com") ? driveOpenMatch?.[1] : "");
+  if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`;
+  return image;
 }
 
 function resolveProductImage(
@@ -38,15 +54,194 @@ function resolveProductImage(
   fallback?: Product,
   fallbackProducts: Product[] = [],
 ) {
-  const image = product.imageUrl || product.image_url || product.image;
+  const image = normalizeExternalImageUrl(product.imageUrl || product.image_url || product.image);
   if (image && !isBlockedPlaceholderImage(image)) return image;
   return fallback?.image || fallbackProducts[0]?.image || placeholderImage(product.name || "Gift");
 }
 
-function ProductCard({ product }: { product: Product }) {
+function productImages(product: Product) {
+  const images = [
+    ...(product.images || []),
+    normalizeExternalImageUrl(product.imageUrl),
+    normalizeExternalImageUrl(product.image2Url),
+    normalizeExternalImageUrl(product.image2),
+    normalizeExternalImageUrl(product.image),
+  ]
+    .filter((image): image is string => Boolean(image && !isBlockedPlaceholderImage(image)))
+    .filter((image, index, list) => list.indexOf(image) === index);
+  const firstImage = images[0] || placeholderImage(product.name || "Gift");
+  const secondImage = images[1] || firstImage;
+  return [firstImage, secondImage];
+}
+
+function ProductImageSlider({ product }: { product: Product }) {
+  const images = productImages(product);
+  const [activeImage, setActiveImage] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  const showPrevious = () =>
+    setActiveImage((current) => (current + images.length - 1) % images.length);
+  const showNext = () => setActiveImage((current) => (current + 1) % images.length);
+
+  return (
+    <div
+      className="overflow-hidden touch-pan-y select-none"
+      onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
+      onTouchEnd={(event) => {
+        if (touchStart === null) return;
+        const distance = touchStart - (event.changedTouches[0]?.clientX ?? touchStart);
+        if (Math.abs(distance) > 36) {
+          if (distance > 0) showNext();
+          else showPrevious();
+        }
+        setTouchStart(null);
+      }}
+    >
+      <div className="relative aspect-square overflow-hidden rounded-[0.85rem] bg-secondary/55">
+        <div
+          className="flex h-full will-change-transform transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${activeImage * 100}%)` }}
+        >
+          {images.map((image, index) => (
+            <img
+              key={`${image}-${index}`}
+              src={optimizedProductImage(image, 960)}
+              srcSet={optimizedProductImageSrcSet(image)}
+              sizes="(max-width: 768px) 92vw, 440px"
+              alt={`${product.name} view ${index + 1}`}
+              draggable={false}
+              className="h-full min-w-full object-cover"
+              width={700}
+              height={700}
+              loading={index === 0 ? "eager" : "lazy"}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={showPrevious}
+          className="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-card/90 text-foreground shadow-card"
+          aria-label="Previous product image"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={showNext}
+          className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-card/90 text-foreground shadow-card"
+          aria-label="Next product image"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="mt-3 flex justify-center gap-2">
+        {images.map((_, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => setActiveImage(index)}
+            className={`h-2 rounded-full transition-all ${
+              activeImage === index ? "w-6 bg-primary" : "w-2 bg-border"
+            }`}
+            aria-label={`Show product image ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductDetailModal({ product, onClose }: { product: Product; onClose: () => void }) {
   const { addToCart, setCartOpen } = useCommerce();
-  const [showDescription, setShowDescription] = useState(false);
   const isUnavailable = product.isAvailable === false || (product.stockQuantity ?? 1) <= 0;
+
+  const buyNow = () => {
+    if (isUnavailable) return;
+    addToCart(product.id);
+    setCartOpen(true);
+    onClose();
+  };
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end bg-foreground/35 px-3 py-4 backdrop-blur-sm md:place-items-center">
+      <button
+        className="absolute inset-0 cursor-default"
+        type="button"
+        onClick={onClose}
+        aria-label="Close product detail"
+      />
+      <article className="relative grid max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-[1.25rem] border border-border bg-card p-4 shadow-soft animate-in fade-in zoom-in-95 duration-200 md:grid-cols-[1.05fr_0.95fr] md:gap-6 md:p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-card/90 text-foreground shadow-card"
+          aria-label="Close product detail"
+        >
+          <X size={18} />
+        </button>
+        <ProductImageSlider product={product} />
+        <div className="flex flex-col pt-5 md:pt-2">
+          <p className="text-xs uppercase tracking-[0.16em] text-primary">{product.category}</p>
+          <h3 className="mt-2 font-display text-3xl leading-tight text-foreground">
+            {product.name}
+          </h3>
+          <div className="mt-3 flex flex-wrap items-baseline gap-2">
+            <span className="font-display text-2xl text-primary">{formatPrice(product.price)}</span>
+            {product.oldPrice && (
+              <span className="text-sm text-muted-foreground line-through">
+                {formatPrice(product.oldPrice)}
+              </span>
+            )}
+          </div>
+          <p className="mt-5 text-sm leading-7 text-muted-foreground">{product.desc}</p>
+          <div className="mt-auto grid gap-3 pt-6 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => addToCart(product.id)}
+              disabled={isUnavailable}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            >
+              <ShoppingBag size={16} />
+              Add to Cart
+            </button>
+            <button
+              type="button"
+              onClick={buyNow}
+              disabled={isUnavailable}
+              className="rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            >
+              Buy Now
+            </button>
+          </div>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function ProductCard({
+  product,
+  onViewProduct,
+}: {
+  product: Product;
+  onViewProduct: (product: Product) => void;
+}) {
+  const { addToCart, setCartOpen } = useCommerce();
+  const isUnavailable = product.isAvailable === false || (product.stockQuantity ?? 1) <= 0;
+  const images = productImages(product);
 
   const buyNow = () => {
     if (isUnavailable) return;
@@ -55,18 +250,19 @@ function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[0.75rem] border border-border bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft">
+    <article className="group flex h-full min-h-[285px] flex-col overflow-hidden rounded-[0.75rem] border border-border bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft md:min-h-[330px]">
       <button
         type="button"
-        onClick={() => setShowDescription((current) => !current)}
+        onClick={() => onViewProduct(product)}
         className="block bg-secondary/55 p-2 text-left"
-        aria-expanded={showDescription}
+        aria-label={`View ${product.name} details`}
       >
         <div className="relative aspect-square overflow-hidden rounded-[0.6rem]">
           <SiteImage
-            src={product.image}
+            src={images[0]}
             alt={product.name}
             loading="lazy"
+            sizes="(max-width: 640px) 46vw, (max-width: 1024px) 30vw, 300px"
             width={300}
             height={300}
             containerClassName="h-full"
@@ -81,13 +277,8 @@ function ProductCard({ product }: { product: Product }) {
         <div className="mb-1 text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
           {product.category}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDescription((current) => !current)}
-          className="text-left"
-          aria-expanded={showDescription}
-        >
-          <h3 className="font-display text-sm leading-tight text-foreground md:text-base">
+        <button type="button" onClick={() => onViewProduct(product)} className="text-left">
+          <h3 className="line-clamp-2 min-h-[2.25rem] font-display text-sm leading-tight text-foreground md:min-h-[2.5rem] md:text-base">
             {product.name}
           </h3>
         </button>
@@ -101,9 +292,6 @@ function ProductCard({ product }: { product: Product }) {
             </span>
           )}
         </div>
-        {showDescription && (
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">{product.desc}</p>
-        )}
         <div className="mt-auto grid gap-1.5 pt-3 xl:grid-cols-2">
           <a
             href={product.cartUrl}
@@ -136,14 +324,14 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
-function ProductSection({ id, products }: ProductSectionProps) {
+function ProductSection({ id, products, onViewProduct }: ProductSectionProps) {
   if (!products.length) return null;
 
   return (
     <section id={id}>
-      <div className="grid grid-cols-3 gap-2 md:gap-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
         {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard key={product.id} product={product} onViewProduct={onViewProduct} />
         ))}
       </div>
     </section>
@@ -153,6 +341,7 @@ function ProductSection({ id, products }: ProductSectionProps) {
 export function Shop({ collectionSlug = null }: ShopProps) {
   const [query, setQuery] = useState("");
   const [collectionProductsFromDb, setCollectionProductsFromDb] = useState<Product[] | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { products } = useCommerce();
 
   useEffect(() => {
@@ -163,8 +352,9 @@ export function Shop({ collectionSlug = null }: ShopProps) {
     }
 
     const controller = new AbortController();
-    fetch(`/api/products?category=${category}`, {
+    fetch(`/api/products?category=${category}&t=${Date.now()}`, {
       credentials: "include",
+      cache: "no-store",
       signal: controller.signal,
     })
       .then((response) => response.json())
@@ -181,6 +371,13 @@ export function Shop({ collectionSlug = null }: ShopProps) {
             };
             const fallback = products.find((item) => item.id === product.id);
             const dbCategory = product.categorySlug || product.category;
+            const images = productImages({
+              ...product,
+              image: resolveProductImage(row, fallback, products),
+              images: product.images || fallback?.images,
+              image2: product.image2 || fallback?.image2,
+              image2Url: product.image2Url || fallback?.image2Url,
+            });
             return {
               ...product,
               category: categoryLabel(dbCategory),
@@ -188,7 +385,10 @@ export function Shop({ collectionSlug = null }: ShopProps) {
               collection: categoryToCollection[category],
               tag: product.tag || fallback?.tag || "New",
               desc: product.desc || fallback?.desc || "",
-              image: resolveProductImage(row, fallback, products),
+              image: images[0],
+              images,
+              image2: images[1],
+              image2Url: images[1],
               cartUrl: product.cartUrl || fallback?.cartUrl || `/cart/add/${product.id}`,
               oldPrice: product.oldPrice ?? row.old_price ?? fallback?.oldPrice,
               rating: product.rating ?? fallback?.rating ?? 4.8,
@@ -267,11 +467,17 @@ export function Shop({ collectionSlug = null }: ShopProps) {
             </div>
           </div>
 
-          <div className="mt-10 grid grid-cols-3 gap-2 md:gap-3">
+          <div className="mt-10 grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
             {collectionProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} onViewProduct={setSelectedProduct} />
             ))}
           </div>
+          {selectedProduct && (
+            <ProductDetailModal
+              product={selectedProduct}
+              onClose={() => setSelectedProduct(null)}
+            />
+          )}
         </div>
       </section>
     );
@@ -280,8 +486,15 @@ export function Shop({ collectionSlug = null }: ShopProps) {
   return (
     <section className="py-12 md:py-16">
       <div className="mx-auto flex max-w-7xl flex-col gap-12 px-6 md:px-10">
-        <ProductSection id="best-selling-products" products={bestSellingProducts} />
+        <ProductSection
+          id="best-selling-products"
+          products={bestSellingProducts}
+          onViewProduct={setSelectedProduct}
+        />
       </div>
+      {selectedProduct && (
+        <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+      )}
     </section>
   );
 }

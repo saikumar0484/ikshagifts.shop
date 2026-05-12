@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { deductProductStock, priceCart } from "./_lib/catalog.js";
 import { db } from "./_lib/db.js";
 import { json, method, readBody } from "./_lib/http.js";
+import { sendStoreEmail } from "./_lib/otp.js";
 import { assertSameOrigin, rateLimit, requireJson, safeString } from "./_lib/security.js";
 import { getSessionUser, hashPassword, requireUser } from "./_lib/session.js";
 
@@ -13,9 +14,43 @@ const firstStatus = {
   note: "We received your handmade order request.",
 };
 
+const couponMinimumCartValue = 299;
+
+function canEmailCustomer(email?: string | null) {
+  return Boolean(email && !email.endsWith("@orders.ikshagifts.local"));
+}
+
+async function sendOrderPlacedEmail(order: any, user: any) {
+  if (!canEmailCustomer(user.email)) return;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemText = items
+    .map((item: { name?: string; quantity?: number }) => `${item.quantity || 1} x ${item.name}`)
+    .join(", ");
+  await sendStoreEmail({
+    to: user.email,
+    subject: `iksha gifts received your order ${order.id}`,
+    text: `Hi ${user.name}, your iksha gifts order ${order.id} has been placed. ${
+      itemText ? `Items: ${itemText}.` : ""
+    } Total: ₹${order.amount}.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#241f1a">
+        <h2 style="margin:0 0 12px">Order placed</h2>
+        <p>Hi ${user.name},</p>
+        <p>Your iksha gifts order <strong>${order.id}</strong> has been placed.</p>
+        ${itemText ? `<p><strong>Items:</strong> ${itemText}</p>` : ""}
+        <p><strong>Total:</strong> ₹${order.amount}</p>
+        <p>We will update you when the order moves ahead.</p>
+      </div>
+    `,
+  }).catch(() => undefined);
+}
+
 function couponDiscount(code: string, total: number) {
   const normalized = code.trim().toUpperCase();
   if (normalized === "IKSHA150") {
+    if (total < couponMinimumCartValue) {
+      throw new Error("Add minimum ₹299 to apply coupon.");
+    }
     return { code: normalized, discount: Math.min(150, total) };
   }
   if (!normalized) return { code: "", discount: 0 };
@@ -129,6 +164,7 @@ export default async function handler(req: any, res: any) {
 
     await deductProductStock(priced.lines);
     await db.upsert("carts", { user_id: user.id, items: [] }, "user_id");
+    await sendOrderPlacedEmail(order, user);
     json(res, 201, { order });
   } catch (error) {
     if (error instanceof Error && error.message === "RATE_LIMITED") return;

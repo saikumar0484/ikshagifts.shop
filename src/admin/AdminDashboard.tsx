@@ -35,6 +35,7 @@ import {
   Users,
 } from "lucide-react";
 import { categoryLabel, formatPrice, productCategories, ProductCategory } from "@/data/products";
+import { notifyCatalogChange } from "@/lib/catalogRealtime";
 
 type ProductRow = {
   id: string;
@@ -43,6 +44,7 @@ type ProductRow = {
   tag: string;
   description: string;
   image_url: string | null;
+  image_url_2?: string | null;
   price: number;
   old_price: number | null;
   rating: number;
@@ -207,6 +209,7 @@ const emptyProduct: ProductRow = {
   tag: "New",
   description: "",
   image_url: "",
+  image_url_2: "",
   price: 0,
   old_price: null,
   rating: 4.8,
@@ -535,6 +538,7 @@ export function AdminDashboard() {
         method: products.some((product) => product.id === productDraft.id) ? "PATCH" : "POST",
         body: JSON.stringify(productDraft),
       });
+      notifyCatalogChange();
       setProductDraft(emptyProduct);
       setTab("product-list");
       await loadAll();
@@ -551,6 +555,7 @@ export function AdminDashboard() {
         method: "DELETE",
         body: JSON.stringify({ id: product.id }),
       });
+      notifyCatalogChange();
       if (productDraft.id === product.id) setProductDraft(emptyProduct);
       await loadAll();
     } catch (err) {
@@ -565,6 +570,7 @@ export function AdminDashboard() {
         method: "PATCH",
         body: JSON.stringify({ ...product, ...patch }),
       });
+      notifyCatalogChange();
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Product could not be updated.");
@@ -714,7 +720,30 @@ export function AdminDashboard() {
     }
   };
 
-  const attachProductImage = async (file: File | null) => {
+  const splitProductImages = (value?: string | null, image2?: string | null) => {
+    const images = String(value || "")
+      .split("||")
+      .map((image) => image.trim())
+      .filter(Boolean);
+    if (image2) images[1] = image2;
+    return [images[0] || "", images[1] || ""];
+  };
+
+  const productDraftImages = splitProductImages(productDraft.image_url, productDraft.image_url_2);
+
+  const updateProductImage = (index: 0 | 1, value: string) => {
+    setProductDraft((current) => {
+      const images = splitProductImages(current.image_url, current.image_url_2);
+      images[index] = value;
+      return {
+        ...current,
+        image_url: images.filter(Boolean).join("||"),
+        image_url_2: images[1] || "",
+      };
+    });
+  };
+
+  const attachProductImage = async (file: File | null, index: 0 | 1) => {
     if (!file) return;
     setError("");
     setImageUploading(true);
@@ -732,10 +761,7 @@ export function AdminDashboard() {
         method: "POST",
         body: JSON.stringify({ name: productDraft.name || file.name, dataUrl }),
       });
-      setProductDraft((current) => ({
-        ...current,
-        image_url: data.imageUrl,
-      }));
+      updateProductImage(index, data.imageUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image could not be uploaded.");
     } finally {
@@ -1730,31 +1756,53 @@ export function AdminDashboard() {
                     />
                   </label>
                 </div>
-                <label className="text-sm font-medium">
-                  Image URL
-                  <input
-                    value={productDraft.image_url || ""}
-                    onChange={(event) =>
-                      setProductDraft((current) => ({ ...current, image_url: event.target.value }))
-                    }
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
-                  />
-                </label>
-                <label className="text-sm font-medium">
-                  Image Upload
-                  <span className="mt-1 flex items-center gap-3 rounded-xl border border-input bg-background px-3 py-2 text-sm">
-                    <Upload size={16} className="text-primary" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-sm font-medium">
+                    Image 1 URL
                     <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={(event) => attachProductImage(event.target.files?.[0] || null)}
-                      className="w-full text-sm"
+                      value={productDraftImages[0]}
+                      onChange={(event) => updateProductImage(0, event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
                     />
-                  </span>
+                  </label>
+                  <label className="text-sm font-medium">
+                    Image 2 URL
+                    <input
+                      value={productDraftImages[1]}
+                      onChange={(event) => updateProductImage(1, event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-sm font-medium">
+                    Image 1 Upload
+                    <span className="mt-1 flex items-center gap-3 rounded-xl border border-input bg-background px-3 py-2 text-sm">
+                      <Upload size={16} className="text-primary" />
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => attachProductImage(event.target.files?.[0] || null, 0)}
+                        className="w-full text-sm"
+                      />
+                    </span>
+                  </label>
+                  <label className="text-sm font-medium">
+                    Image 2 Upload
+                    <span className="mt-1 flex items-center gap-3 rounded-xl border border-input bg-background px-3 py-2 text-sm">
+                      <Upload size={16} className="text-primary" />
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => attachProductImage(event.target.files?.[0] || null, 1)}
+                        className="w-full text-sm"
+                      />
+                    </span>
+                  </label>
                   {imageUploading && (
-                    <span className="mt-1 block text-xs text-primary">Uploading image...</span>
+                    <span className="text-xs text-primary md:col-span-2">Uploading image...</span>
                   )}
-                </label>
+                </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="text-sm font-medium">
                     Badge
@@ -1843,9 +1891,9 @@ export function AdminDashboard() {
             <aside className="rounded-2xl border border-border bg-card p-5">
               <h3 className="font-display text-2xl">Preview</h3>
               <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-background">
-                {productDraft.image_url ? (
+                {productDraftImages[0] ? (
                   <img
-                    src={productDraft.image_url}
+                    src={productDraftImages[0]}
                     alt={productDraft.name || "Product preview"}
                     className="aspect-[4/3] w-full object-cover"
                   />
@@ -1944,9 +1992,9 @@ export function AdminDashboard() {
                   className="grid gap-4 border-b border-border px-5 py-4 last:border-b-0 lg:grid-cols-[80px_1.4fr_120px_150px_160px_110px] lg:items-center"
                 >
                   <div className="h-20 w-20 overflow-hidden rounded-xl bg-background">
-                    {product.image_url ? (
+                    {splitProductImages(product.image_url, product.image_url_2)[0] ? (
                       <img
-                        src={product.image_url}
+                        src={splitProductImages(product.image_url, product.image_url_2)[0]}
                         alt={product.name}
                         className="h-full w-full object-cover"
                       />
@@ -2198,6 +2246,92 @@ export function AdminDashboard() {
                             className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 outline-none focus:border-primary"
                           />
                         </label>
+                        <div className="rounded-2xl border border-border bg-background p-4">
+                          <h3 className="font-display text-xl">SMTP mailbox</h3>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                            Use this when you want OTP, order updates, and customer emails sent from
+                            your own mailbox. For Gmail, use an app password, not your normal email
+                            password.
+                          </p>
+                          <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <label className="text-sm font-medium md:col-span-2">
+                              SMTP host
+                              <input
+                                value={draft.publicConfig.smtpHost || ""}
+                                placeholder="smtp.gmail.com"
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { smtpHost: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-medium">
+                              Port
+                              <input
+                                value={draft.publicConfig.smtpPort || "465"}
+                                placeholder="465"
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: { smtpPort: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm md:col-span-3">
+                              <input
+                                type="checkbox"
+                                checked={draft.publicConfig.smtpSecure !== "false"}
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    publicConfig: {
+                                      smtpSecure: event.target.checked ? "true" : "false",
+                                    },
+                                  })
+                                }
+                              />
+                              Use secure SSL/TLS connection
+                            </label>
+                            <label className="text-sm font-medium md:col-span-3">
+                              SMTP username / email
+                              <input
+                                type="password"
+                                value={draft.secrets.smtpUser || ""}
+                                placeholder={
+                                  integration.secrets.smtpUser?.configured
+                                    ? `Saved: ${integration.secrets.smtpUser.masked}`
+                                    : "your@email.com"
+                                }
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    secrets: { smtpUser: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-medium md:col-span-3">
+                              SMTP password / app password
+                              <input
+                                type="password"
+                                value={draft.secrets.smtpPass || ""}
+                                placeholder={
+                                  integration.secrets.smtpPass?.configured
+                                    ? `Saved: ${integration.secrets.smtpPass.masked}`
+                                    : "Paste app password"
+                                }
+                                onChange={(event) =>
+                                  updateIntegrationDraft(integration.key, {
+                                    secrets: { smtpPass: event.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2 outline-none focus:border-primary"
+                              />
+                            </label>
+                          </div>
+                        </div>
                         <label className="text-sm font-medium">
                           Resend API key
                           <input

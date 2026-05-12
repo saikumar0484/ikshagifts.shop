@@ -23,8 +23,7 @@ const whatsappLink =
 
 export function Nav() {
   const [open, setOpen] = useState(false);
-  const { cartCount, setCartOpen, setOrdersOpen, loadOrders, openAuth, user, logout } =
-    useCommerce();
+  const { cartCount, setCartOpen, setOrdersOpen, loadOrders, openAuth, user } = useCommerce();
   const activeCollection = useMemo(() => {
     const match = window.location.pathname.match(/^\/collections\/(women|men|custom)/);
     return match?.[1] || null;
@@ -133,10 +132,17 @@ export function Nav() {
           </a>
           <button
             type="button"
-            onClick={() => (user ? logout() : openAuth("login"))}
+            onClick={() => {
+              if (user) {
+                window.history.pushState(null, "", "/account");
+                window.dispatchEvent(new PopStateEvent("popstate"));
+                return;
+              }
+              openAuth("login");
+            }}
             className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card text-foreground transition-colors hover:border-primary hover:text-primary"
-            aria-label={user ? "Log out" : "Log in"}
-            title={user ? `Logged in as ${user.name}. Click to log out.` : "Log in"}
+            aria-label={user ? "Open account" : "Log in"}
+            title={user ? `Account: ${user.name}` : "Log in"}
           >
             <UserRound size={18} />
           </button>
@@ -209,7 +215,12 @@ export function Nav() {
             <button
               type="button"
               onClick={() => {
-                openAuth("login");
+                if (user) {
+                  window.history.pushState(null, "", "/account");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                } else {
+                  openAuth("login");
+                }
                 setOpen(false);
               }}
               className="rounded-full border border-border px-4 py-3 text-sm font-semibold text-foreground"

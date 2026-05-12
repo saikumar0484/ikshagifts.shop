@@ -283,7 +283,7 @@ This is the practical summary of the major requests and decisions that happened 
   - email OTP structure through Resend-style flow
   - phone/WhatsApp OTP structure through configurable provider logic
 - The business does not currently have AiSensy or Twilio
-- The app currently falls back to a blocked state for automated phone OTP because a real provider is still missing
+- Customer login now uses free Supabase Email OTP. No password UI and no SMS OTP are exposed.
 
 ### Domain, deployment, and publishing direction
 
@@ -382,33 +382,17 @@ See:
 
 ## Known blockers and important caveats
 
-### OTP signup blocker
+### Email OTP login
 
-Customer mobile OTP flows cannot fully work yet because automated phone or WhatsApp OTP sending is not configured.
+Customer login/register now uses Supabase Email OTP only.
 
-Observed live API response:
+Required Supabase Dashboard settings:
 
-- `/api/auth/request-otp` returns a `400` with a message saying automated WhatsApp OTP is not configured
+- Authentication -> Providers -> Email: enable Email Provider.
+- Authentication -> Providers -> Email: enable Confirm Email.
+- Authentication -> Email Templates: use an OTP template with `{{ .Token }}` instead of only a magic-link URL.
 
-What this means:
-
-- Browsing works
-- The new mobile-first login and signup UI is in place
-- Real customer OTP delivery is blocked until a real provider is connected
-
-### Recommended OTP fix
-
-Use one of these:
-
-- WhatsApp Cloud API
-- AiSensy
-- Twilio
-- Another approved phone OTP provider
-
-Also note:
-
-- Email OTP should be completed through Resend or another configured email provider
-- `request-otp` currently creates pending signup rows before both channels are guaranteed to send; this should be tightened if more cleanup issues appear
+The customer auth flow does not expose password login, SMS OTP, or mobile OTP.
 
 ### Razorpay
 
@@ -551,3 +535,26 @@ Whenever the owner asks for changes, fixes, deployment work, setup help, or busi
 - Keep notes short, practical, and useful for the next session.
 - Do not remove older handoff notes unless they are clearly obsolete and replaced with newer truth.
 - If a change affects live setup, auth, payments, database, products, admin, or deployment, record it here before finishing.
+
+## 2026-05-08 Resume From Full Project Safe Zip
+
+The owner provided a newer continuation archive:
+
+```text
+C:\Users\Admin\Documents\New project 2\ikshagifts-shop-full-project-safe-20260507-214118.zip
+```
+
+This archive was extracted into:
+
+```text
+C:\Users\Admin\Documents\New project 2\ikshagifts-shop-full-project-safe-20260507-214118-extracted\ikshagifts-shop
+```
+
+New handoff files created during resume:
+
+- `CURRENT_CODEX_MEMORY.md`
+- `FULL_ZIP_FILE_INVENTORY.md`
+
+Future Codex/developer should read those files along with this README and `CODEX_CHECKPOINTS.md` before making changes.
+
+The original zip was preserved untouched.

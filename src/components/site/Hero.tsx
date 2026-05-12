@@ -112,6 +112,7 @@ export function Hero() {
                     height={1100}
                     loading={slideIndex === 0 ? "eager" : "lazy"}
                     fetchPriority={slideIndex === 0 ? "high" : "auto"}
+                    sizes="(max-width: 1024px) 100vw, 860px"
                     containerClassName="h-full"
                     className="animate-hero-zoom h-full w-full object-cover transition duration-700 group-hover:scale-[1.03] motion-reduce:animate-none"
                   />
